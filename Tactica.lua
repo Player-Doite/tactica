@@ -695,7 +695,10 @@ function Tactica:CommandHandler(msg)
 
 	elseif command == "roles" or command == "role" then
         self:PostRoleSummary()
-	
+
+	elseif command == "export" or command == "exportroles" then
+        self:ShowExportRolesFrame()
+
 	elseif command == "rolewhisper" then
 		if not TacticaDB or not TacticaDB.Settings then return end
 		TacticaDB.Settings.RoleWhisperEnabled = not TacticaDB.Settings.RoleWhisperEnabled
@@ -1008,6 +1011,7 @@ function Tactica:PrintHelp()
 	self:PrintMessage("  |cffffff00/ttclear|r or |cffffff00/tt clearroles|r (clear role assignments manually)");
 	self:PrintMessage("  |cffffff00/tt rolewhisper|r (toggle whisper role confirmation)")
 	self:PrintMessage("  |cffffff00/tt roles|r (post Tanks/Healers/DPS to raid)")
+	self:PrintMessage("  |cffffff00/tt export|r (export roster as copyable CSV)")
 	self:PrintMessage("  |cffffff00/tt options|r (small options panel for toggles)")
 	self:PrintMessage("  |cffffff00/w Doite|r (addon and tactics by Doite)");
 end
@@ -1133,6 +1137,140 @@ function Tactica:PostRoleSummary()
 
     local line = string.format("[Tactica]: DPS - [%d]: The rest of the raid.", dpsTotal)
     SendChatMessage(line, "RAID")
+end
+
+--- Shows a copyable CSV export of the raid roster with roles
+function Tactica:ShowExportRolesFrame()
+    if not (UnitInRaid and UnitInRaid("player")) then
+        self:PrintError("You must be in a raid.")
+        return
+    end
+
+    -- Create frame if it doesn't exist
+    if not self.exportFrame then
+        local f = CreateFrame("Frame", "TacticaExportFrame", UIParent)
+        f:SetWidth(450)
+        f:SetHeight(400)
+        f:SetPoint("CENTER", UIParent, "CENTER")
+        f:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Gold",
+            tile = true, tileSize = 32, edgeSize = 32,
+            insets = { left = 11, right = 12, top = 12, bottom = 11 }
+        })
+        f:SetBackdropColor(0, 0, 0, 1)
+        f:EnableMouse(true)
+        f:SetMovable(true)
+        f:RegisterForDrag("LeftButton")
+        f:SetScript("OnDragStart", function() this:StartMoving() end)
+        f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+
+        -- Title
+        local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        title:SetPoint("TOP", f, "TOP", 0, -20)
+        title:SetText("Tactica - Export Raid Roster")
+
+        -- Instructions
+        local instructions = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        instructions:SetPoint("TOP", f, "TOP", 0, -45)
+        instructions:SetText("Select all (Ctrl+A) and copy (Ctrl+C) to clipboard:")
+
+        -- Scroll frame for the EditBox
+        local scrollFrame = CreateFrame("ScrollFrame", "TacticaExportScrollFrame", f, "UIPanelScrollFrameTemplate")
+        scrollFrame:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -70)
+        scrollFrame:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -35, 50)
+
+        -- Background for scroll area
+        local bg = CreateFrame("Frame", nil, f)
+        bg:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", -5, 5)
+        bg:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 5, -5)
+        bg:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 16,
+            insets = { left = 4, right = 4, top = 4, bottom = 4 }
+        })
+        bg:SetBackdropColor(0, 0, 0, 0.5)
+
+        -- The multiline EditBox
+        local editBox = CreateFrame("EditBox", "TacticaExportEditBox", scrollFrame)
+        editBox:SetMultiLine(true)
+        editBox:SetAutoFocus(false)
+        editBox:SetFontObject("ChatFontNormal")
+        editBox:SetWidth(380)
+        editBox:SetHeight(1000)
+        editBox:SetMaxLetters(0)
+        editBox:SetScript("OnEscapePressed", function() f:Hide() end)
+        scrollFrame:SetScrollChild(editBox)
+
+        -- Close button
+        local closeBtn = CreateFrame("Button", nil, f, "GameMenuButtonTemplate")
+        closeBtn:SetWidth(100)
+        closeBtn:SetHeight(25)
+        closeBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 20)
+        closeBtn:SetText("Close")
+        closeBtn:SetScript("OnClick", function() f:Hide() end)
+
+        self.exportFrame = f
+        self.exportEditBox = editBox
+    end
+
+    -- Generate TSV data (tab-separated for Google Sheets)
+    local tsvLines = {"Player Name\tClass\tRole"}
+    local total = (GetNumRaidMembers and GetNumRaidMembers()) or 0
+    local T = (TacticaDB and TacticaDB.Tanks) or {}
+    local H = (TacticaDB and TacticaDB.Healers) or {}
+    local D = (TacticaDB and TacticaDB.DPS) or {}
+
+    -- Collect all raid members with their class and role
+    local raidData = {}
+    for i = 1, total do
+        local name, _, _, _, class = GetRaidRosterInfo(i)
+        if name and name ~= "" then
+            local role = "DPS"  -- Default to DPS
+            if T[name] then
+                role = "Tank"
+            elseif H[name] then
+                role = "Healer"
+            elseif D[name] then
+                role = "DPS"
+            end
+
+            -- Get localized class name
+            local className = class or "Unknown"
+
+            table.insert(raidData, {name = name, class = className, role = role})
+        end
+    end
+
+    -- Sort by role (Tank > Healer > DPS), then by name
+    table.sort(raidData, function(a, b)
+        local roleOrder = {Tank = 1, Healer = 2, DPS = 3}
+        local aOrder = roleOrder[a.role] or 4
+        local bOrder = roleOrder[b.role] or 4
+        if aOrder ~= bOrder then
+            return aOrder < bOrder
+        else
+            return string.lower(a.name) < string.lower(b.name)
+        end
+    end)
+
+    -- Build TSV (tab-separated)
+    for _, entry in ipairs(raidData) do
+        table.insert(tsvLines, string.format("%s\t%s\t%s", entry.name, entry.class, entry.role))
+    end
+
+    local tsvText = table.concat(tsvLines, "\n")
+
+    -- Set the text in the EditBox
+    self.exportEditBox:SetText(tsvText)
+    self.exportEditBox:HighlightText()
+    self.exportEditBox:SetFocus()
+
+    -- Show the frame
+    self.exportFrame:Show()
+
+    self:PrintMessage("Raid roster exported. Press Ctrl+A to select all, then Ctrl+C to copy.")
 end
 
 -------------------------------------------------
