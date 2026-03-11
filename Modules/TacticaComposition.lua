@@ -189,6 +189,11 @@ local function AddAlias(discordName, alias)
   TacticaDB.Composition.nameMap[discordName][alias] = true
 end
 
+local function ClearAliases(discordName)
+  EnsureDB()
+  TacticaDB.Composition.nameMap[discordName] = nil
+end
+
 local function FindAutoMatch(discordName)
   local raidNames = getRaidMemberNamesLower()
   local aliases = BuildAliasList(discordName)
@@ -216,6 +221,10 @@ function TC:Open()
   end
 end
 
+function TC:OpenSetupStep()
+  cfmsg("3/3. Setup is not implemented yet.")
+end
+
 function TC:ShowImportFrame()
   EnsureDB()
   if not self.importFrame then self:CreateImportFrame() end
@@ -227,6 +236,7 @@ function TC:ShowImportFrame()
   end
   SetButtonEnabled(self.importFrame.submit, trim(existing) ~= "")
   self.importFrame:Show()
+  self.importFrame:Raise()
 end
 
 function TC:CreateImportFrame()
@@ -234,14 +244,14 @@ function TC:CreateImportFrame()
   f:SetWidth(760); f:SetHeight(520)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   f:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=24, insets={left=8,right=8,top=8,bottom=8} })
-  f:SetMovable(true); f:EnableMouse(true)
+  f:SetMovable(true); f:EnableMouse(true); f:SetToplevel(true); f:SetFrameStrata("DIALOG")
   f:RegisterForDrag("LeftButton")
   f:SetScript("OnDragStart", function() this:StartMoving() end)
   f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  title:SetPoint("TOP", f, "TOP", 0, -18)
-  title:SetText("TACTICA COMPOSITION TOOL")
+  title:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -18)
+  title:SetText("TACTICA COMPOSITION TOOL - 1/3. Import")
   title:SetTextColor(TITLE_R, TITLE_G, TITLE_B)
 
   local sub = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -272,16 +282,22 @@ function TC:CreateImportFrame()
   edit:EnableMouse(true)
   scroll:SetScrollChild(edit)
 
+  local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnImport:SetWidth(130); btnImport:SetHeight(24)
+  btnImport:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 16)
+  btnImport:SetText("<- 1/3. Import")
+  btnImport:Disable()
+
   local submit = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  submit:SetWidth(120); submit:SetHeight(24)
-  submit:SetPoint("BOTTOM", f, "BOTTOM", -70, 20)
-  submit:SetText("Submit")
+  submit:SetWidth(130); submit:SetHeight(24)
+  submit:SetPoint("BOTTOM", f, "BOTTOM", 0, 16)
+  submit:SetText("2/3. Matching")
   submit:Disable()
 
-  local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  cancel:SetWidth(120); cancel:SetHeight(24)
-  cancel:SetPoint("LEFT", submit, "RIGHT", 16, 0)
-  cancel:SetText("Cancel")
+  local btnSetup = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnSetup:SetWidth(130); btnSetup:SetHeight(24)
+  btnSetup:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 16)
+  btnSetup:SetText("3/3. Setup ->")
 
   bg:EnableMouse(true)
   scroll:EnableMouse(true)
@@ -302,7 +318,7 @@ function TC:CreateImportFrame()
     if ScrollingEdit_OnCursorChanged then ScrollingEdit_OnCursorChanged() end
   end)
 
-  cancel:SetScript("OnClick", function() f:Hide() end)
+  btnSetup:SetScript("OnClick", function() TC:OpenSetupStep() end)
   edit:SetScript("OnTextChanged", function()
     local lines = countLines(edit:GetText())
     local minH = 320
@@ -325,6 +341,8 @@ function TC:CreateImportFrame()
 
   f.input = edit
   f.inputScroll = scroll
+  f.btnImport = btnImport
+  f.btnSetup = btnSetup
   f.submit = submit
   self.importFrame = f
 end
@@ -339,6 +357,10 @@ function TC:RefreshCompositionRows()
   local rows = f.rows
   local i
   for i=1, table.getn(rows) do rows[i]:Hide() end
+  if f.unmatchedTitle then f.unmatchedTitle:Hide() end
+  for i=1, table.getn(f.unmatchedRows or {}) do f.unmatchedRows[i]:Hide() end
+
+  local matchedLower = {}
 
   for i=1, table.getn(data.slots) do
     local slot = data.slots[i]
@@ -376,10 +398,12 @@ function TC:RefreshCompositionRows()
     local slotName = slot.name
     local rowRef = row
     local aliases = BuildAliasList(slotName)
+
     UIDropDownMenu_Initialize(rowRef.dd, function()
       local info = UIDropDownMenu_CreateInfo()
       info.text = "Select name"; info.notCheckable = 1; info.isTitle = 1
       UIDropDownMenu_AddButton(info)
+
       local j
       for j=1,table.getn(aliases) do
         local alias = aliases[j]
@@ -391,11 +415,23 @@ function TC:RefreshCompositionRows()
         end
         UIDropDownMenu_AddButton(it)
       end
+
+      local clr = UIDropDownMenu_CreateInfo()
+      clr.text = "- DELELTE/CLEAR -"
+      clr.notCheckable = 1
+      clr.func = function()
+        ClearAliases(slotName)
+        UIDropDownMenu_SetText("Select", rowRef.dd)
+        TC:RefreshCompositionRows()
+      end
+      UIDropDownMenu_AddButton(clr)
     end)
+
     UIDropDownMenu_SetText((table.getn(aliases) > 0 and aliases[1]) or "Select", rowRef.dd)
 
     local autoName = FindAutoMatch(slotName)
     if autoName then
+      matchedLower[lower(autoName)] = autoName
       local isAlias = false
       local j
       for j=1,table.getn(aliases) do if lower(aliases[j]) == lower(autoName) then isAlias = true end end
@@ -424,10 +460,52 @@ function TC:RefreshCompositionRows()
     rowRef:Show()
   end
 
-  local last = rows[table.getn(data.slots)]
-  if last then
-    f.content:SetHeight(math.max(1, table.getn(data.slots) * 28 + 8))
+  -- Unmatched/Not Listed section (joined but not currently matched)
+  local members = getRaidMemberNamesLower()
+  local unmatched = {}
+  local nm
+  for k, v in pairs(members) do
+    if not matchedLower[k] then table.insert(unmatched, v) end
   end
+  table.sort(unmatched)
+
+  local last = rows[table.getn(data.slots)]
+  local anchor = last
+
+  if not f.unmatchedTitle then
+    f.unmatchedTitle = f.content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.unmatchedTitle:SetJustifyH("LEFT")
+  end
+
+  if anchor then
+    f.unmatchedTitle:ClearAllPoints()
+    f.unmatchedTitle:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -14)
+  else
+    f.unmatchedTitle:ClearAllPoints()
+    f.unmatchedTitle:SetPoint("TOPLEFT", f.content, "TOPLEFT", 0, 0)
+  end
+  f.unmatchedTitle:SetText("UNMATCHED/NOT LISTED")
+  f.unmatchedTitle:Show()
+
+  f.unmatchedRows = f.unmatchedRows or {}
+  local prev = f.unmatchedTitle
+  for i=1, table.getn(unmatched) do
+    local fs = f.unmatchedRows[i]
+    if not fs then
+      fs = f.content:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      fs:SetJustifyH("LEFT")
+      f.unmatchedRows[i] = fs
+    end
+    fs:ClearAllPoints()
+    fs:SetPoint("TOPLEFT", prev, "BOTTOMLEFT", 0, -4)
+    fs:SetText("- " .. unmatched[i])
+    fs:Show()
+    prev = fs
+  end
+
+  local rowsBottom = table.getn(data.slots) * 28 + 8
+  local unmatchedExtra = 24 + (table.getn(unmatched) * 16)
+  f.content:SetHeight(math.max(1, rowsBottom + unmatchedExtra))
 end
 
 function TC:ShowCompositionFrame()
@@ -436,6 +514,7 @@ function TC:ShowCompositionFrame()
   if not self.viewFrame then self:CreateCompositionFrame() end
   self:RefreshCompositionRows()
   self.viewFrame:Show()
+  self.viewFrame:Raise()
 end
 
 function TC:CreateCompositionFrame()
@@ -443,10 +522,14 @@ function TC:CreateCompositionFrame()
   f:SetWidth(820); f:SetHeight(560)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   f:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=24, insets={left=8,right=8,top=8,bottom=8} })
+  f:SetMovable(true); f:EnableMouse(true); f:SetToplevel(true); f:SetFrameStrata("DIALOG")
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  title:SetPoint("TOP", f, "TOP", 0, -18)
-  title:SetText("TACTICA COMPOSITION TOOL")
+  title:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -18)
+  title:SetText("TACTICA COMPOSITION TOOL - 2/3. Matching")
   title:SetTextColor(TITLE_R, TITLE_G, TITLE_B)
 
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -460,17 +543,34 @@ function TC:CreateCompositionFrame()
   content:SetWidth(730); content:SetHeight(1)
   scroll:SetScrollChild(content)
 
-  local importBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-  importBtn:SetWidth(120); importBtn:SetHeight(24)
-  importBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 16)
-  importBtn:SetText("Import")
-  importBtn:SetScript("OnClick", function()
+  local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnImport:SetWidth(130); btnImport:SetHeight(24)
+  btnImport:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 16)
+  btnImport:SetText("<- 1/3. Import")
+  btnImport:SetScript("OnClick", function()
     f:Hide()
     TC:ShowImportFrame()
   end)
 
+  local btnMatching = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnMatching:SetWidth(130); btnMatching:SetHeight(24)
+  btnMatching:SetPoint("BOTTOM", f, "BOTTOM", 0, 16)
+  btnMatching:SetText("2/3. Matching")
+  btnMatching:Disable()
+
+  local btnSetup = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnSetup:SetWidth(130); btnSetup:SetHeight(24)
+  btnSetup:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 16)
+  btnSetup:SetText("3/3. Setup ->")
+  btnSetup:SetScript("OnClick", function() TC:OpenSetupStep() end)
+
   f.rows = {}
+  f.unmatchedTitle = nil
+  f.unmatchedRows = {}
   f.content = content
+  f.btnImport = btnImport
+  f.btnMatching = btnMatching
+  f.btnSetup = btnSetup
   self.viewFrame = f
 end
 
