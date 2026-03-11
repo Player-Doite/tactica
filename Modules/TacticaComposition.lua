@@ -255,7 +255,9 @@ function TC:CreateImportFrame()
   title:SetTextColor(TITLE_R, TITLE_G, TITLE_B)
 
   local sub = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  sub:SetPoint("TOP", title, "BOTTOM", 0, -10)
+  sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+  sub:SetWidth(700)
+  sub:SetJustifyH("LEFT")
   sub:SetText("Import JSON export from Raid-Helper's Composition Tool, after you have arranged all groups.")
   sub:SetTextColor(1,1,1)
 
@@ -264,7 +266,7 @@ function TC:CreateImportFrame()
 
   local bg = CreateFrame("Frame", nil, f)
   bg:SetWidth(700); bg:SetHeight(360)
-  bg:SetPoint("TOP", sub, "BOTTOM", 0, -14)
+  bg:SetPoint("TOP", f, "TOP", 0, -92)
   bg:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
   bg:SetBackdropColor(0,0,0,0.85)
 
@@ -431,7 +433,6 @@ function TC:RefreshCompositionRows()
 
     local autoName = FindAutoMatch(slotName)
     if autoName then
-      matchedLower[lower(autoName)] = autoName
       local isAlias = false
       local j
       for j=1,table.getn(aliases) do if lower(aliases[j]) == lower(autoName) then isAlias = true end end
@@ -443,6 +444,11 @@ function TC:RefreshCompositionRows()
       end
     else
       rowRef.input:SetText("")
+    end
+
+    local ddText = UIDropDownMenu_GetText and UIDropDownMenu_GetText(rowRef.dd) or ""
+    if ddText and ddText ~= "" and ddText ~= "Select" and ddText ~= "Select name" and ddText ~= "- DELELTE/CLEAR -" then
+      matchedLower[lower(ddText)] = ddText
     end
 
     SetButtonEnabled(rowRef.add, trim(rowRef.input:GetText()) ~= "")
