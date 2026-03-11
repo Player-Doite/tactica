@@ -11,3 +11,4 @@ Modules\TacticaRaidRoles.lua
 Modules\TacticaLoot.lua
 Modules\TacticaRaidBuilder.lua
 Modules\TacticaInvite.lua
+Modules\TacticaComposition.lua

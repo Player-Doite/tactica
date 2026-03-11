@@ -677,6 +677,14 @@ function Tactica:CommandHandler(msg)
 	  end
 	  return
 
+	elseif command == "comp" or command == "composition" then
+	  if TacticaComposition and TacticaComposition.Open then
+		TacticaComposition:Open()
+	  else
+		self:PrintError("Composition module not loaded.")
+	  end
+	  return
+
 	elseif command == "lfm" then
 	  if TacticaRaidBuilder and TacticaRaidBuilder.AnnounceOnce then TacticaRaidBuilder.AnnounceOnce() end
 
@@ -1009,6 +1017,7 @@ function Tactica:PrintHelp()
 	self:PrintMessage("  |cffffff00/tt rolewhisper|r (toggle whisper role confirmation)")
 	self:PrintMessage("  |cffffff00/tt roles|r (post Tanks/Healers/DPS to raid)")
 	self:PrintMessage("  |cffffff00/tt options|r (small options panel for toggles)")
+	self:PrintMessage("  |cffffff78/tt comp|r or |cffffff78/tt composition|r (open composition tool)")
 	self:PrintMessage("  |cffffff00/w Doite|r (addon and tactics by Doite)");
 end
 
@@ -2249,6 +2258,7 @@ do
       "|cffffff00/tt roles|r – post tank/healer summary",
       "|cffffff00/tt rolewhisper|r – toggle role whisper",
       "|cffffff00/tt options|r – options panel",
+      "|cffffff78/tt comp|r – open composition tool",
     }
   end
 
@@ -2282,6 +2292,13 @@ do
         TacticaInvite.Open()
       else
         if Tactica and Tactica.PrintError then Tactica:PrintError("Auto-Invite module not loaded.") end
+      end
+    end)
+	add("Open Composition Tool", function()
+      if TacticaComposition and TacticaComposition.Open then
+        TacticaComposition:Open()
+      else
+        if Tactica and Tactica.PrintError then Tactica:PrintError("Composition module not loaded.") end
       end
     end)
     add("Open Options", function() if Tactica and Tactica.ShowOptionsFrame then Tactica:ShowOptionsFrame() end end)
