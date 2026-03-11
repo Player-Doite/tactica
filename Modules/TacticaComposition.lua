@@ -173,6 +173,7 @@ local function ParseAndStoreCurrent(raw)
     return nil
   end
   TacticaDB.Composition.current = parsed
+  if TC then TC.setupOverrides = {} end
   return parsed
 end
 
@@ -268,7 +269,7 @@ function TC:CreateImportFrame()
   title:SetTextColor(TITLE_R, TITLE_G, TITLE_B)
 
   local sub = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
+  sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -14)
   sub:SetWidth(700)
   sub:SetJustifyH("LEFT")
   sub:SetText("Import JSON export from Raid-Helper's Composition Tool, after you have arranged all groups.")
@@ -282,7 +283,7 @@ function TC:CreateImportFrame()
   topSep:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
   topSep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -44)
   topSep:SetHeight(2)
-  topSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+  topSep:SetVertexColor(1, 1, 1, 0.9)
 
   local bg = CreateFrame("Frame", nil, f)
   bg:SetWidth(700); bg:SetHeight(360)
@@ -309,7 +310,7 @@ function TC:CreateImportFrame()
   bottomSep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
   bottomSep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 48)
   bottomSep:SetHeight(2)
-  bottomSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+  bottomSep:SetVertexColor(1, 1, 1, 0.9)
 
   local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnImport:SetWidth(130); btnImport:SetHeight(24)
@@ -605,7 +606,7 @@ function TC:CreateCompositionFrame()
   topSep:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
   topSep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -44)
   topSep:SetHeight(2)
-  topSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+  topSep:SetVertexColor(1, 1, 1, 0.9)
 
   local scroll = CreateFrame("ScrollFrame", "TacticaCompositionViewScrollFrame", f, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -46)
@@ -620,7 +621,7 @@ function TC:CreateCompositionFrame()
   bottomSep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
   bottomSep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 48)
   bottomSep:SetHeight(2)
-  bottomSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+  bottomSep:SetVertexColor(1, 1, 1, 0.9)
 
   local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnImport:SetWidth(130); btnImport:SetHeight(24)
@@ -658,8 +659,182 @@ function TC:ShowSetupFrame()
   if not self.setupFrame then self:CreateSetupFrame() end
   if self.importFrame then self.importFrame:Hide() end
   if self.viewFrame then self.viewFrame:Hide() end
+  self:RefreshSetupFrame()
   self.setupFrame:Show()
   self.setupFrame:Raise()
+end
+
+function TC:RefreshSetupFrame()
+  local f = self.setupFrame
+  if not f then return end
+  local data = TacticaDB and TacticaDB.Composition and TacticaDB.Composition.current
+  if not data then return end
+
+  self.setupOverrides = self.setupOverrides or {}
+
+  local members = getRaidMemberNamesLower()
+  local defaults = {}
+  local matchedLower = {}
+
+  local i
+  for i=1,table.getn(data.slots) do
+    local slot = data.slots[i]
+    local g = tonumber(slot.groupNumber) or 0
+    local sidx = tonumber(slot.slotNumber) or 0
+    if g >= 1 and g <= 8 and sidx >= 1 and sidx <= 5 then
+      local key = g..":"..sidx
+      local aliases = BuildAliasList(slot.name)
+      local autoName = FindAutoMatch(slot.name)
+      local isAlias = false
+      local j
+      for j=1,table.getn(aliases) do if autoName and lower(aliases[j]) == lower(autoName) then isAlias = true end end
+
+      local status = "X"
+      local displayName = slot.name
+      if autoName and isAlias and members[lower(autoName)] then
+        status = "R"
+        displayName = autoName
+        matchedLower[lower(autoName)] = autoName
+      elseif autoName and members[lower(autoName)] then
+        status = "O"
+      end
+
+      local roleLetter = (slot.role == "Tank" and "T") or (slot.role == "Healer" and "H") or "D"
+      defaults[key] = {
+        key = key,
+        slot = slot,
+        role = roleLetter,
+        status = status,
+        name = displayName,
+      }
+    end
+  end
+
+  local raidUnlisted = {}
+  for k, nm in pairs(members) do
+    if not matchedLower[k] then table.insert(raidUnlisted, nm) end
+  end
+  table.sort(raidUnlisted)
+
+  local function statusColor(st)
+    if st == "R" then return "|cff00ff00" end
+    if st == "O" then return "|cffffa500" end
+    return "|cffff5555"
+  end
+
+  local function colorizedName(slot, name)
+    local r,g,b = hexToRGB(slot.color)
+    local rr,gg,bb = math.floor(r*255), math.floor(g*255), math.floor(b*255)
+    return string.format("|cff%02x%02x%02x%s|r", rr,gg,bb, tostring(name or ""))
+  end
+
+  local function defaultText(d)
+    return "("..d.role..") "..colorizedName(d.slot, d.name).." - "..statusColor(d.status)..d.status.."|r"
+  end
+
+  -- pool contains raid-unlisted + displaced defaults from overridden slots
+  local pool = {}
+  local used = {}
+  for i=1,table.getn(raidUnlisted) do
+    local nm = raidUnlisted[i]
+    local id = "raid:"..lower(nm)
+    pool[id] = { id=id, kind="raid", name=nm, text="(?) "..nm.." - |cff00ff00R|r" }
+  end
+
+  for key, ov in pairs(self.setupOverrides) do
+    if ov and defaults[key] then
+      local d = defaults[key]
+      local id = "slot:"..key
+      pool[id] = { id=id, kind="slot", sourceKey=key, role=d.role, name=d.name, slot=d.slot, status=d.status, text=defaultText(d) }
+      used[id] = true
+    end
+  end
+
+  local function effectiveFor(key)
+    local d = defaults[key]
+    if not d then return "", "X" end
+    local ov = self.setupOverrides[key]
+    if not ov then
+      return defaultText(d), d.status
+    end
+
+    if ov.kind == "raid" then
+      local st = members[lower(ov.name or "")] and "R" or "X"
+      local txt = "("..d.role..") "..colorizedName(d.slot, ov.name or "").." - "..statusColor(st)..st.."|r"
+      return txt, st
+    elseif ov.kind == "slot" and defaults[ov.sourceKey] then
+      local src = defaults[ov.sourceKey]
+      local txt = "("..src.role..") "..colorizedName(src.slot, src.name).." - "..statusColor(src.status)..src.status.."|r"
+      return txt, src.status
+    end
+
+    return defaultText(d), d.status
+  end
+
+  local g,sidx
+  for g=1,8 do
+    for sidx=1,5 do
+      local key = g..":"..sidx
+      local slotUI = f.groupSlots[g] and f.groupSlots[g][sidx]
+      if slotUI then
+        local d = defaults[key]
+        if d then
+          local txt = effectiveFor(key)
+          slotUI.label:SetText(txt)
+        else
+          slotUI.label:SetText("-")
+        end
+
+        UIDropDownMenu_Initialize(slotUI.dd, function()
+          local info = UIDropDownMenu_CreateInfo()
+          info.text = "Default"
+          info.notCheckable = 1
+          info.func = function()
+            self.setupOverrides[key] = nil
+            UIDropDownMenu_SetText("Default", slotUI.dd)
+            self:RefreshSetupFrame()
+          end
+          UIDropDownMenu_AddButton(info)
+
+          for _, nm in ipairs(raidUnlisted) do
+            local ri = UIDropDownMenu_CreateInfo()
+            ri.text = "Use: "..nm
+            ri.notCheckable = 1
+            ri.func = function()
+              self.setupOverrides[key] = { kind="raid", name=nm }
+              UIDropDownMenu_SetText(nm, slotUI.dd)
+              self:RefreshSetupFrame()
+            end
+            UIDropDownMenu_AddButton(ri)
+          end
+
+          local k, entry
+          for k, entry in pairs(pool) do
+            if entry.kind == "slot" and entry.sourceKey ~= key then
+              local si = UIDropDownMenu_CreateInfo()
+              si.text = "Use: "..entry.text
+              si.notCheckable = 1
+              si.func = function()
+                self.setupOverrides[key] = { kind="slot", sourceKey=entry.sourceKey }
+                UIDropDownMenu_SetText("from "..entry.sourceKey, slotUI.dd)
+                self:RefreshSetupFrame()
+              end
+              UIDropDownMenu_AddButton(si)
+            end
+          end
+        end)
+
+        local ov = self.setupOverrides[key]
+        if ov and ov.kind == "raid" then
+          UIDropDownMenu_SetText(ov.name or "raid", slotUI.dd)
+        elseif ov and ov.kind == "slot" then
+          UIDropDownMenu_SetText("from "..tostring(ov.sourceKey or "?"), slotUI.dd)
+        else
+          UIDropDownMenu_SetText("Default", slotUI.dd)
+        end
+      end
+    end
+  end
 end
 
 function TC:CreateSetupFrame()
@@ -685,19 +860,57 @@ function TC:CreateSetupFrame()
   topSep:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
   topSep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -44)
   topSep:SetHeight(2)
-  topSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+  topSep:SetVertexColor(1, 1, 1, 0.9)
 
-  local note = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -16)
-  note:SetText("Setup step is ready for next implementation.")
-  note:SetTextColor(1,1,1)
+  local content = CreateFrame("Frame", nil, f)
+  content:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -52)
+  content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 54)
+
+  f.groupSlots = {}
+  local groupW, groupH = 370, 108
+  local colGap, rowGap = 14, 10
+  local g
+  for g=1,8 do
+    local col = ((g-1) % 2)
+    local row = math.floor((g-1) / 2)
+    local gf = CreateFrame("Frame", nil, content)
+    gf:SetWidth(groupW); gf:SetHeight(groupH)
+    gf:SetPoint("TOPLEFT", content, "TOPLEFT", col * (groupW + colGap), -(row * (groupH + rowGap)))
+    gf:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
+    gf:SetBackdropColor(0,0,0,0.45)
+
+    local gtitle = gf:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    gtitle:SetPoint("TOPLEFT", gf, "TOPLEFT", 8, -6)
+    gtitle:SetText("Group "..g)
+    gtitle:SetTextColor(1,1,1)
+
+    f.groupSlots[g] = {}
+    local sidx
+    for sidx=1,5 do
+      local rowf = CreateFrame("Frame", nil, gf)
+      rowf:SetWidth(groupW-14); rowf:SetHeight(16)
+      rowf:SetPoint("TOPLEFT", gf, "TOPLEFT", 7, -8 - (sidx*17))
+
+      local label = rowf:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      label:SetPoint("LEFT", rowf, "LEFT", 0, 0)
+      label:SetWidth(250)
+      label:SetJustifyH("LEFT")
+      label:SetText("-")
+
+      local dd = CreateFrame("Frame", "TacticaCompositionSetupDropDownG"..g.."S"..sidx, rowf, "UIDropDownMenuTemplate")
+      dd:SetPoint("LEFT", label, "RIGHT", -12, -2)
+      UIDropDownMenu_SetWidth(96, dd)
+
+      f.groupSlots[g][sidx] = { frame=rowf, label=label, dd=dd }
+    end
+  end
 
   local bottomSep = f:CreateTexture(nil, "ARTWORK")
   bottomSep:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
   bottomSep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
   bottomSep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 48)
   bottomSep:SetHeight(2)
-  bottomSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+  bottomSep:SetVertexColor(1, 1, 1, 0.9)
 
   local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnImport:SetWidth(130); btnImport:SetHeight(24)
@@ -744,10 +957,14 @@ ev:SetScript("OnEvent", function()
       if TC.viewFrame then TC.viewFrame:Hide() end
       if TC.importFrame then TC.importFrame:Hide() end
       if TC.setupFrame then TC.setupFrame:Hide() end
+      TC.setupOverrides = {}
     end
     _wasInRaid = inRaid
     if TC.viewFrame and TC.viewFrame:IsShown() then
       TC:RefreshCompositionRows()
+    end
+    if TC.setupFrame and TC.setupFrame:IsShown() then
+      TC:RefreshSetupFrame()
     end
   end
 end)
