@@ -401,6 +401,7 @@ local function InitializeSavedVariables()
 	  TacticaDB.Settings.AutoPostOnBoss = true
 	end
 
+
 	-- Default: whisper confirmations on role change (ON)
 	if TacticaDB.Settings.RoleWhisperEnabled == nil then
 	  TacticaDB.Settings.RoleWhisperEnabled = true
@@ -422,6 +423,52 @@ local function InitializeSavedVariables()
 	if TacticaDB.Settings.RoleWhisperEnabled == nil then
 		TacticaDB.Settings.RoleWhisperEnabled = true
 	end
+end
+
+local TacticaExportFormatOptions = {
+    { value = "name",             text = "Only Name",              header = "Player Name" },
+    { value = "name_class",       text = "Name & Class",           header = "Player Name\tClass" },
+    { value = "name_role",        text = "Name & Role",            header = "Player Name\tRole" },
+    { value = "name_class_role",  text = "Name, Class & Role",     header = "Player Name\tClass\tRole" },
+}
+
+local function TacticaGetExportFormatOption(value)
+    local _, opt
+    for _, opt in ipairs(TacticaExportFormatOptions) do
+        if opt.value == value then
+            return opt
+        end
+    end
+    return TacticaExportFormatOptions[4]
+end
+
+local function TacticaGetExportFormat()
+    TacticaDB = TacticaDB or {}
+    TacticaDB.Settings = TacticaDB.Settings or {}
+    local opt = TacticaGetExportFormatOption(TacticaDB.Settings.ExportFormat)
+    TacticaDB.Settings.ExportFormat = opt.value
+    return opt
+end
+
+local TacticaExportLabelOptions = {
+    { value = false, text = "No labels" },
+    { value = true,  text = "Include labels" },
+}
+
+local function TacticaGetExportIncludeLabels()
+    TacticaDB = TacticaDB or {}
+    TacticaDB.Settings = TacticaDB.Settings or {}
+    if TacticaDB.Settings.ExportIncludeLabels == nil then
+        TacticaDB.Settings.ExportIncludeLabels = true
+    end
+    return (TacticaDB.Settings.ExportIncludeLabels == true)
+end
+
+local function TacticaGetExportLabelText(includeLabels)
+    if includeLabels then
+        return "Include labels"
+    end
+    return "No labels"
 end
 
 f:SetScript("OnEvent", function()
@@ -1146,6 +1193,72 @@ function Tactica:ShowExportRolesFrame()
         return
     end
 
+    local function FillExportData()
+        local formatOpt = TacticaGetExportFormat()
+
+        -- Generate TSV data (tab-separated for Google Sheets)
+        local includeLabels = TacticaGetExportIncludeLabels()
+        local tsvLines = {}
+        if includeLabels then
+            table.insert(tsvLines, formatOpt.header)
+        end
+        local total = (GetNumRaidMembers and GetNumRaidMembers()) or 0
+        local T = (TacticaDB and TacticaDB.Tanks) or {}
+        local H = (TacticaDB and TacticaDB.Healers) or {}
+        local D = (TacticaDB and TacticaDB.DPS) or {}
+
+        -- Collect all raid members with their class and role
+        local raidData = {}
+        local i
+        for i = 1, total do
+            local name, _, _, _, class = GetRaidRosterInfo(i)
+            if name and name ~= "" then
+                local role = "DPS"
+                if T[name] then
+                    role = "Tank"
+                elseif H[name] then
+                    role = "Healer"
+                elseif D[name] then
+                    role = "DPS"
+                end
+
+                table.insert(raidData, {name = name, class = class or "Unknown", role = role})
+            end
+        end
+
+        -- Sort by role (Tank > Healer > DPS), then by name
+        table.sort(raidData, function(a, b)
+            local roleOrder = {Tank = 1, Healer = 2, DPS = 3}
+            local aOrder = roleOrder[a.role] or 4
+            local bOrder = roleOrder[b.role] or 4
+            if aOrder ~= bOrder then
+                return aOrder < bOrder
+            else
+                return string.lower(a.name) < string.lower(b.name)
+            end
+        end)
+
+        local _, entry
+        for _, entry in ipairs(raidData) do
+            local row
+            if formatOpt.value == "name" then
+                row = entry.name
+            elseif formatOpt.value == "name_class" then
+                row = string.format("%s\t%s", entry.name, entry.class)
+            elseif formatOpt.value == "name_role" then
+                row = string.format("%s\t%s", entry.name, entry.role)
+            else
+                row = string.format("%s\t%s\t%s", entry.name, entry.class, entry.role)
+            end
+            table.insert(tsvLines, row)
+        end
+
+        local tsvText = table.concat(tsvLines, "\n")
+        self.exportEditBox:SetText(tsvText)
+        self.exportEditBox:HighlightText()
+        self.exportEditBox:SetFocus()
+    end
+
     -- Create frame if it doesn't exist
     if not self.exportFrame then
         local f = CreateFrame("Frame", "TacticaExportFrame", UIParent)
@@ -1167,12 +1280,14 @@ function Tactica:ShowExportRolesFrame()
 
         -- Title
         local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        title:SetPoint("TOP", f, "TOP", 0, -20)
+        title:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -20)
+        title:SetJustifyH("LEFT")
         title:SetText("Tactica - Export Raid Roster")
 
         -- Instructions
         local instructions = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        instructions:SetPoint("TOP", f, "TOP", 0, -45)
+        instructions:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -45)
+        instructions:SetJustifyH("LEFT")
         instructions:SetText("Select all (Ctrl+A) and copy (Ctrl+C) to clipboard:")
 
         -- Scroll frame for the EditBox
@@ -1203,69 +1318,75 @@ function Tactica:ShowExportRolesFrame()
         editBox:SetScript("OnEscapePressed", function() f:Hide() end)
         scrollFrame:SetScrollChild(editBox)
 
-        -- Close button
-        local closeBtn = CreateFrame("Button", nil, f, "GameMenuButtonTemplate")
-        closeBtn:SetWidth(100)
-        closeBtn:SetHeight(25)
-        closeBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 20)
-        closeBtn:SetText("Close")
-        closeBtn:SetScript("OnClick", function() f:Hide() end)
+        -- Top-right close button (X)
+        local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+        closeButton:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -10)
+
+        -- Output format dropdown row
+        local outputLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        outputLabel:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 20, 23)
+        outputLabel:SetText("Output:")
+
+        local outputDrop = CreateFrame("Frame", "TacticaExportOutputDropdown", f, "UIDropDownMenuTemplate")
+        outputDrop:SetPoint("LEFT", outputLabel, "RIGHT", -10, 0)
+        UIDropDownMenu_SetWidth(145, outputDrop)
+
+        UIDropDownMenu_Initialize(outputDrop, function()
+            local _, opt
+            for _, opt in ipairs(TacticaExportFormatOptions) do
+                UIDropDownMenu_AddButton({
+                    text = opt.text,
+                    value = opt.value,
+                    checked = (TacticaGetExportFormat().value == opt.value),
+                    func = function()
+                        local picked = this and this.value or opt.value
+                        local selectedOpt = TacticaGetExportFormatOption(picked)
+                        TacticaDB.Settings.ExportFormat = selectedOpt.value
+                        UIDropDownMenu_SetText(selectedOpt.text, outputDrop)
+                        FillExportData()
+                        CloseDropDownMenus()
+                    end
+                })
+            end
+        end)
+
+        local labelsLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        labelsLabel:SetPoint("LEFT", outputDrop, "RIGHT", -2, 0)
+        labelsLabel:SetText("Label:")
+
+        local labelsDrop = CreateFrame("Frame", "TacticaExportLabelsDropdown", f, "UIDropDownMenuTemplate")
+        labelsDrop:SetPoint("LEFT", labelsLabel, "RIGHT", -10, 0)
+        UIDropDownMenu_SetWidth(120, labelsDrop)
+
+        UIDropDownMenu_Initialize(labelsDrop, function()
+            local _, opt
+            for _, opt in ipairs(TacticaExportLabelOptions) do
+                UIDropDownMenu_AddButton({
+                    text = opt.text,
+                    value = opt.value,
+                    checked = (TacticaGetExportIncludeLabels() == opt.value),
+                    func = function()
+                        local picked = this and this.value
+                        if picked == nil then picked = opt.value end
+                        TacticaDB.Settings.ExportIncludeLabels = (picked == true)
+                        UIDropDownMenu_SetText(TacticaGetExportLabelText(TacticaDB.Settings.ExportIncludeLabels), labelsDrop)
+                        FillExportData()
+                        CloseDropDownMenus()
+                    end
+                })
+            end
+        end)
 
         self.exportFrame = f
         self.exportEditBox = editBox
+        self.exportOutputDropdown = outputDrop
+        self.exportLabelsDropdown = labelsDrop
     end
 
-    -- Generate TSV data (tab-separated for Google Sheets)
-    local tsvLines = {"Player Name\tClass\tRole"}
-    local total = (GetNumRaidMembers and GetNumRaidMembers()) or 0
-    local T = (TacticaDB and TacticaDB.Tanks) or {}
-    local H = (TacticaDB and TacticaDB.Healers) or {}
-    local D = (TacticaDB and TacticaDB.DPS) or {}
-
-    -- Collect all raid members with their class and role
-    local raidData = {}
-    for i = 1, total do
-        local name, _, _, _, class = GetRaidRosterInfo(i)
-        if name and name ~= "" then
-            local role = "DPS"  -- Default to DPS
-            if T[name] then
-                role = "Tank"
-            elseif H[name] then
-                role = "Healer"
-            elseif D[name] then
-                role = "DPS"
-            end
-
-            -- Get localized class name
-            local className = class or "Unknown"
-
-            table.insert(raidData, {name = name, class = className, role = role})
-        end
-    end
-
-    -- Sort by role (Tank > Healer > DPS), then by name
-    table.sort(raidData, function(a, b)
-        local roleOrder = {Tank = 1, Healer = 2, DPS = 3}
-        local aOrder = roleOrder[a.role] or 4
-        local bOrder = roleOrder[b.role] or 4
-        if aOrder ~= bOrder then
-            return aOrder < bOrder
-        else
-            return string.lower(a.name) < string.lower(b.name)
-        end
-    end)
-
-    -- Build TSV (tab-separated)
-    for _, entry in ipairs(raidData) do
-        table.insert(tsvLines, string.format("%s\t%s\t%s", entry.name, entry.class, entry.role))
-    end
-
-    local tsvText = table.concat(tsvLines, "\n")
-
-    -- Set the text in the EditBox
-    self.exportEditBox:SetText(tsvText)
-    self.exportEditBox:HighlightText()
-    self.exportEditBox:SetFocus()
+    local currentOpt = TacticaGetExportFormat()
+    UIDropDownMenu_SetText(currentOpt.text, self.exportOutputDropdown)
+    UIDropDownMenu_SetText(TacticaGetExportLabelText(TacticaGetExportIncludeLabels()), self.exportLabelsDropdown)
+    FillExportData()
 
     -- Show the frame
     self.exportFrame:Show()
@@ -2379,6 +2500,7 @@ do
 	  "|cffffff78/tt build|r – open Raid Builder",  
 	  "|cffffff78/tt lfm|r – announce Raid Builder msg",
 	  "|cffffff78/tt autoinvite|r – open Auto Invite",
+	  "|cffffff78/tt export|r – export raid roster",
       "|cffffff00/tt post|r – open post UI",
       "|cffffff00/tt add|r – add custom tactic",
       "|cffffff00/tt remove|r – remove custom tactic",
@@ -2422,6 +2544,7 @@ do
         if Tactica and Tactica.PrintError then Tactica:PrintError("Auto-Invite module not loaded.") end
       end
     end)
+	add("Open Export", function() if Tactica and Tactica.ShowExportRolesFrame then Tactica:ShowExportRolesFrame() end end)
     add("Open Options", function() if Tactica and Tactica.ShowOptionsFrame then Tactica:ShowOptionsFrame() end end)
     add("Tactica Help",  function() if Tactica and Tactica.PrintHelp then Tactica:PrintHelp() end end)
   end
