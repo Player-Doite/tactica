@@ -871,7 +871,7 @@ function TC:CreateSetupFrame()
   local colGap, rowGap = 14, 10
   local g
   for g=1,8 do
-    local col = ((g-1) % 2)
+    local col = math.mod((g-1), 2)
     local row = math.floor((g-1) / 2)
     local gf = CreateFrame("Frame", nil, content)
     gf:SetWidth(groupW); gf:SetHeight(groupH)
