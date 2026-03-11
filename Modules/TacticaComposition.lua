@@ -166,6 +166,16 @@ local function ParseCompositionJson(raw)
   return { raw = text, slots = slots, importedAt = time and time() or 0 }
 end
 
+local function ParseAndStoreCurrent(raw)
+  local parsed = ParseCompositionJson(raw)
+  if not parsed then
+    cfmsg("Wrong format. Please paste the JSON export directly from Raid-Helper's Composition Tool.")
+    return nil
+  end
+  TacticaDB.Composition.current = parsed
+  return parsed
+end
+
 local function SetButtonEnabled(btn, enabled)
   if not btn then return end
   if enabled then btn:Enable() else btn:Disable() end
@@ -234,7 +244,9 @@ function TC:ShowImportFrame()
   if self.importFrame.inputScroll and self.importFrame.inputScroll.SetVerticalScroll then
     self.importFrame.inputScroll:SetVerticalScroll(0)
   end
-  SetButtonEnabled(self.importFrame.submit, trim(existing) ~= "")
+  local hasInput = trim(existing) ~= ""
+  SetButtonEnabled(self.importFrame.submit, hasInput)
+  if self.importFrame.btnSetup then SetButtonEnabled(self.importFrame.btnSetup, hasInput) end
   if self.setupFrame then self.setupFrame:Hide() end
   self.importFrame:Show()
   self.importFrame:Raise()
@@ -321,7 +333,11 @@ function TC:CreateImportFrame()
     if ScrollingEdit_OnCursorChanged then ScrollingEdit_OnCursorChanged() end
   end)
 
-  btnSetup:SetScript("OnClick", function() TC:OpenSetupStep() end)
+  btnSetup:SetScript("OnClick", function()
+    if not ParseAndStoreCurrent(edit:GetText()) then return end
+    f:Hide()
+    TC:OpenSetupStep()
+  end)
   edit:SetScript("OnTextChanged", function()
     local lines = countLines(edit:GetText())
     local minH = 320
@@ -329,15 +345,12 @@ function TC:CreateImportFrame()
     if targetH < minH then targetH = minH end
     edit:SetHeight(targetH)
     if ScrollingEdit_OnTextChanged then ScrollingEdit_OnTextChanged() end
-    SetButtonEnabled(submit, trim(edit:GetText()) ~= "")
+    local hasInput = trim(edit:GetText()) ~= ""
+    SetButtonEnabled(submit, hasInput)
+    SetButtonEnabled(btnSetup, hasInput)
   end)
   submit:SetScript("OnClick", function()
-    local parsed = ParseCompositionJson(edit:GetText())
-    if not parsed then
-      cfmsg("Wrong format. Please paste the JSON export directly from Raid-Helper's Composition Tool.")
-      return
-    end
-    TacticaDB.Composition.current = parsed
+    if not ParseAndStoreCurrent(edit:GetText()) then return end
     f:Hide()
     TC:ShowCompositionFrame()
   end)
@@ -370,12 +383,12 @@ function TC:RefreshCompositionRows()
     local row = rows[i]
     if not row then
       row = CreateFrame("Frame", nil, f.content)
-      row:SetWidth(700); row:SetHeight(24)
+      row:SetWidth(748); row:SetHeight(24)
       if i == 1 then row:SetPoint("TOPLEFT", f.content, "TOPLEFT", 0, 0) else row:SetPoint("TOPLEFT", rows[i-1], "BOTTOMLEFT", 0, -4) end
 
       row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
       row.label:SetPoint("LEFT", row, "LEFT", 0, 0)
-      row.label:SetWidth(350); row.label:SetJustifyH("LEFT")
+      row.label:SetWidth(320); row.label:SetJustifyH("LEFT")
 
       row.input = CreateFrame("EditBox", nil, row)
       row.input:SetAutoFocus(false)
@@ -468,11 +481,11 @@ function TC:RefreshCompositionRows()
 
     if dropdownJoined then
       matchedLower[lower(ddText)] = ddText
-      rowRef.status:SetText("|cff00ff00✓|r")
+      rowRef.status:SetText("|cff00ff00[V]|r")
     elseif autoName and autoName ~= "" and membersNow[lower(autoName)] then
-      rowRef.status:SetText("|cffffa500●|r")
+      rowRef.status:SetText("|cffffa500[o]|r")
     else
-      rowRef.status:SetText("|cffff5555✗|r")
+      rowRef.status:SetText("|cffff5555[X]|r")
     end
 
     rowRef.input:SetScript("OnEditFocusGained", function()
@@ -578,7 +591,7 @@ function TC:CreateCompositionFrame()
   scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 48)
 
   local content = CreateFrame("Frame", nil, scroll)
-  content:SetWidth(730); content:SetHeight(1)
+  content:SetWidth(758); content:SetHeight(1)
   scroll:SetScrollChild(content)
 
   local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
