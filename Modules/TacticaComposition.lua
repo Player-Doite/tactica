@@ -222,7 +222,7 @@ function TC:Open()
 end
 
 function TC:OpenSetupStep()
-  cfmsg("3/3. Setup is not implemented yet.")
+  self:ShowSetupFrame()
 end
 
 function TC:ShowImportFrame()
@@ -235,6 +235,7 @@ function TC:ShowImportFrame()
     self.importFrame.inputScroll:SetVerticalScroll(0)
   end
   SetButtonEnabled(self.importFrame.submit, trim(existing) ~= "")
+  if self.setupFrame then self.setupFrame:Hide() end
   self.importFrame:Show()
   self.importFrame:Raise()
 end
@@ -400,6 +401,10 @@ function TC:RefreshCompositionRows()
       row.dd:SetPoint("LEFT", row.add, "RIGHT", -4, -3)
       UIDropDownMenu_SetWidth(150, row.dd)
 
+      row.status = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+      row.status:SetPoint("LEFT", row.dd, "RIGHT", 10, 0)
+      row.status:SetJustifyH("LEFT")
+
       rows[i] = row
     end
 
@@ -457,8 +462,17 @@ function TC:RefreshCompositionRows()
     end
 
     local ddText = UIDropDownMenu_GetText and UIDropDownMenu_GetText(rowRef.dd) or ""
-    if ddText and ddText ~= "" and ddText ~= "Select" and ddText ~= "Select name" and ddText ~= "- DELELTE/CLEAR -" then
+    local hasDropdownSelection = ddText and ddText ~= "" and ddText ~= "Select" and ddText ~= "Select name" and ddText ~= "- DELELTE/CLEAR -"
+    local membersNow = getRaidMemberNamesLower()
+    local dropdownJoined = hasDropdownSelection and membersNow[lower(ddText)] and true or false
+
+    if dropdownJoined then
       matchedLower[lower(ddText)] = ddText
+      rowRef.status:SetText("|cff00ff00✓|r")
+    elseif autoName and autoName ~= "" and membersNow[lower(autoName)] then
+      rowRef.status:SetText("|cffffa500●|r")
+    else
+      rowRef.status:SetText("|cffff5555✗|r")
     end
 
     rowRef.input:SetScript("OnEditFocusGained", function()
@@ -536,6 +550,7 @@ function TC:ShowCompositionFrame()
   if not TacticaDB.Composition.current then self:ShowImportFrame(); return end
   if not self.viewFrame then self:CreateCompositionFrame() end
   self:RefreshCompositionRows()
+  if self.setupFrame then self.setupFrame:Hide() end
   self.viewFrame:Show()
   self.viewFrame:Raise()
 end
@@ -597,6 +612,65 @@ function TC:CreateCompositionFrame()
   self.viewFrame = f
 end
 
+function TC:ShowSetupFrame()
+  EnsureDB()
+  if not self.setupFrame then self:CreateSetupFrame() end
+  if self.importFrame then self.importFrame:Hide() end
+  if self.viewFrame then self.viewFrame:Hide() end
+  self.setupFrame:Show()
+  self.setupFrame:Raise()
+end
+
+function TC:CreateSetupFrame()
+  local f = CreateFrame("Frame", "TacticaCompositionSetupFrame", UIParent)
+  f:SetWidth(820); f:SetHeight(560)
+  f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+  f:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=24, insets={left=8,right=8,top=8,bottom=8} })
+  f:SetMovable(true); f:EnableMouse(true); f:SetToplevel(true); f:SetFrameStrata("DIALOG")
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+
+  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  title:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -18)
+  title:SetText("TACTICA COMPOSITION TOOL - 3/3. Setup")
+  title:SetTextColor(TITLE_R, TITLE_G, TITLE_B)
+
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+
+  local note = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -16)
+  note:SetText("Setup step is ready for next implementation.")
+  note:SetTextColor(1,1,1)
+
+  local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnImport:SetWidth(130); btnImport:SetHeight(24)
+  btnImport:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, 16)
+  btnImport:SetText("<- 1/3. Import")
+  btnImport:SetScript("OnClick", function()
+    f:Hide()
+    TC:ShowImportFrame()
+  end)
+
+  local btnMatching = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnMatching:SetWidth(130); btnMatching:SetHeight(24)
+  btnMatching:SetPoint("BOTTOM", f, "BOTTOM", 0, 16)
+  btnMatching:SetText("2/3. Matching")
+  btnMatching:SetScript("OnClick", function()
+    f:Hide()
+    TC:ShowCompositionFrame()
+  end)
+
+  local btnSetup = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnSetup:SetWidth(130); btnSetup:SetHeight(24)
+  btnSetup:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 16)
+  btnSetup:SetText("3/3. Setup ->")
+  btnSetup:Disable()
+
+  self.setupFrame = f
+end
+
 local _wasInRaid = false
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
@@ -614,6 +688,7 @@ ev:SetScript("OnEvent", function()
       TacticaDB.Composition.current = nil
       if TC.viewFrame then TC.viewFrame:Hide() end
       if TC.importFrame then TC.importFrame:Hide() end
+      if TC.setupFrame then TC.setupFrame:Hide() end
     end
     _wasInRaid = inRaid
     if TC.viewFrame and TC.viewFrame:IsShown() then
