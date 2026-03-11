@@ -277,6 +277,13 @@ function TC:CreateImportFrame()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
+  local topSep = f:CreateTexture(nil, "ARTWORK")
+  topSep:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
+  topSep:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
+  topSep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -44)
+  topSep:SetHeight(2)
+  topSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+
   local bg = CreateFrame("Frame", nil, f)
   bg:SetWidth(700); bg:SetHeight(360)
   bg:SetPoint("TOP", f, "TOP", 0, -92)
@@ -296,6 +303,13 @@ function TC:CreateImportFrame()
   edit:SetAutoFocus(false)
   edit:EnableMouse(true)
   scroll:SetScrollChild(edit)
+
+  local bottomSep = f:CreateTexture(nil, "ARTWORK")
+  bottomSep:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
+  bottomSep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
+  bottomSep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 48)
+  bottomSep:SetHeight(2)
+  bottomSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
 
   local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnImport:SetWidth(130); btnImport:SetHeight(24)
@@ -383,7 +397,7 @@ function TC:RefreshCompositionRows()
     local row = rows[i]
     if not row then
       row = CreateFrame("Frame", nil, f.content)
-      row:SetWidth(748); row:SetHeight(24)
+      row:SetWidth(718); row:SetHeight(24)
       if i == 1 then row:SetPoint("TOPLEFT", f.content, "TOPLEFT", 0, 0) else row:SetPoint("TOPLEFT", rows[i-1], "BOTTOMLEFT", 0, -4) end
 
       row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -415,7 +429,7 @@ function TC:RefreshCompositionRows()
       UIDropDownMenu_SetWidth(150, row.dd)
 
       row.status = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-      row.status:SetPoint("LEFT", row.dd, "RIGHT", 10, 0)
+      row.status:SetPoint("LEFT", row.dd, "RIGHT", 0, 0)
       row.status:SetJustifyH("LEFT")
 
       rows[i] = row
@@ -481,7 +495,7 @@ function TC:RefreshCompositionRows()
 
     if dropdownJoined then
       matchedLower[lower(ddText)] = ddText
-      rowRef.status:SetText("|cff00ff00[V]|r")
+      rowRef.status:SetText("|cff00ff00[R]|r")
     elseif autoName and autoName ~= "" and membersNow[lower(autoName)] then
       rowRef.status:SetText("|cffffa500[o]|r")
     else
@@ -570,7 +584,7 @@ end
 
 function TC:CreateCompositionFrame()
   local f = CreateFrame("Frame", "TacticaCompositionViewFrame", UIParent)
-  f:SetWidth(820); f:SetHeight(560)
+  f:SetWidth(790); f:SetHeight(560)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   f:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=24, insets={left=8,right=8,top=8,bottom=8} })
   f:SetMovable(true); f:EnableMouse(true); f:SetToplevel(true); f:SetFrameStrata("DIALOG")
@@ -586,13 +600,27 @@ function TC:CreateCompositionFrame()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
+  local topSep = f:CreateTexture(nil, "ARTWORK")
+  topSep:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
+  topSep:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
+  topSep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -44)
+  topSep:SetHeight(2)
+  topSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+
   local scroll = CreateFrame("ScrollFrame", "TacticaCompositionViewScrollFrame", f, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -46)
   scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 48)
 
   local content = CreateFrame("Frame", nil, scroll)
-  content:SetWidth(758); content:SetHeight(1)
+  content:SetWidth(728); content:SetHeight(1)
   scroll:SetScrollChild(content)
+
+  local bottomSep = f:CreateTexture(nil, "ARTWORK")
+  bottomSep:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
+  bottomSep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
+  bottomSep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 48)
+  bottomSep:SetHeight(2)
+  bottomSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
 
   local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnImport:SetWidth(130); btnImport:SetHeight(24)
@@ -636,7 +664,7 @@ end
 
 function TC:CreateSetupFrame()
   local f = CreateFrame("Frame", "TacticaCompositionSetupFrame", UIParent)
-  f:SetWidth(820); f:SetHeight(560)
+  f:SetWidth(790); f:SetHeight(560)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   f:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=24, insets={left=8,right=8,top=8,bottom=8} })
   f:SetMovable(true); f:EnableMouse(true); f:SetToplevel(true); f:SetFrameStrata("DIALOG")
@@ -652,10 +680,24 @@ function TC:CreateSetupFrame()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
+  local topSep = f:CreateTexture(nil, "ARTWORK")
+  topSep:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
+  topSep:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -44)
+  topSep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -44)
+  topSep:SetHeight(2)
+  topSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
+
   local note = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   note:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -16)
   note:SetText("Setup step is ready for next implementation.")
   note:SetTextColor(1,1,1)
+
+  local bottomSep = f:CreateTexture(nil, "ARTWORK")
+  bottomSep:SetTexture("Interface\\Tooltips\\UI-Tooltip-Border")
+  bottomSep:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
+  bottomSep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 48)
+  bottomSep:SetHeight(2)
+  bottomSep:SetVertexColor(0.55, 0.55, 0.55, 0.7)
 
   local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnImport:SetWidth(130); btnImport:SetHeight(24)
