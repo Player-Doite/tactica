@@ -376,10 +376,20 @@ function TC:RefreshCompositionRows()
       row.label:SetPoint("LEFT", row, "LEFT", 0, 0)
       row.label:SetWidth(350); row.label:SetJustifyH("LEFT")
 
-      row.input = CreateFrame("EditBox", nil, row, "InputBoxTemplate")
+      row.input = CreateFrame("EditBox", nil, row)
       row.input:SetAutoFocus(false)
+      row.input:SetFontObject(ChatFontNormal)
       row.input:SetWidth(145); row.input:SetHeight(20)
       row.input:SetPoint("LEFT", row.label, "RIGHT", 6, 0)
+      row.input:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 }
+      })
+      row.input:SetBackdropColor(0, 0, 0, 0.75)
+      row.input:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+      row.input:SetTextInsets(6, 6, 0, 0)
 
       row.add = CreateFrame("Button", nil, row, "UIPanelButtonTemplate")
       row.add:SetWidth(35); row.add:SetHeight(20)
@@ -450,6 +460,13 @@ function TC:RefreshCompositionRows()
     if ddText and ddText ~= "" and ddText ~= "Select" and ddText ~= "Select name" and ddText ~= "- DELELTE/CLEAR -" then
       matchedLower[lower(ddText)] = ddText
     end
+
+    rowRef.input:SetScript("OnEditFocusGained", function()
+      rowRef.input:SetBackdropBorderColor(1, 0.82, 0, 1)
+    end)
+    rowRef.input:SetScript("OnEditFocusLost", function()
+      rowRef.input:SetBackdropBorderColor(0.35, 0.35, 0.35, 1)
+    end)
 
     SetButtonEnabled(rowRef.add, trim(rowRef.input:GetText()) ~= "")
     rowRef.input:SetScript("OnTextChanged", function()
