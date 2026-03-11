@@ -258,7 +258,7 @@ function TC:CreateImportFrame()
   bg:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
   bg:SetBackdropColor(0,0,0,0.85)
 
-  local scroll = CreateFrame("ScrollFrame", "TacticaCompositionImportScroll", bg, "UIPanelScrollFrameTemplate")
+  local scroll = CreateFrame("ScrollFrame", "TacticaCompositionImportScrollFrame", bg, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", bg, "TOPLEFT", 8, -8)
   scroll:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", -28, 8)
 
@@ -295,16 +295,11 @@ function TC:CreateImportFrame()
   scroll:SetScript("OnMouseDown", FocusImportEdit)
   edit:SetScript("OnMouseDown", FocusImportEdit)
 
-  scroll:SetScript("OnMouseWheel", function()
-    local cur = scroll:GetVerticalScroll() or 0
-    local step = 40
-    if arg1 and arg1 > 0 then
-      cur = cur - step
-      if cur < 0 then cur = 0 end
-    else
-      cur = cur + step
-    end
-    scroll:SetVerticalScroll(cur)
+  scroll:SetScript("OnVerticalScroll", function()
+    if ScrollingEdit_OnVerticalScroll then ScrollingEdit_OnVerticalScroll(20) end
+  end)
+  edit:SetScript("OnCursorChanged", function()
+    if ScrollingEdit_OnCursorChanged then ScrollingEdit_OnCursorChanged() end
   end)
 
   cancel:SetScript("OnClick", function() f:Hide() end)
@@ -314,6 +309,7 @@ function TC:CreateImportFrame()
     local targetH = lines * 14 + 16
     if targetH < minH then targetH = minH end
     edit:SetHeight(targetH)
+    if ScrollingEdit_OnTextChanged then ScrollingEdit_OnTextChanged() end
     SetButtonEnabled(submit, trim(edit:GetText()) ~= "")
   end)
   submit:SetScript("OnClick", function()
@@ -366,7 +362,7 @@ function TC:RefreshCompositionRows()
       row.add:SetPoint("LEFT", row.input, "RIGHT", 4, 0)
       row.add:SetText("Add")
 
-      row.dd = CreateFrame("Frame", nil, row, "UIDropDownMenuTemplate")
+      row.dd = CreateFrame("Frame", "TacticaCompositionRowDropDown"..i, row, "UIDropDownMenuTemplate")
       row.dd:SetPoint("LEFT", row.add, "RIGHT", -4, -3)
       UIDropDownMenu_SetWidth(150, row.dd)
 
@@ -456,7 +452,7 @@ function TC:CreateCompositionFrame()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
-  local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
+  local scroll = CreateFrame("ScrollFrame", "TacticaCompositionViewScrollFrame", f, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -46)
   scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 48)
 
