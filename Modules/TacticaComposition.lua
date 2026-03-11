@@ -215,6 +215,10 @@ function TC:ShowImportFrame()
   if not self.importFrame then self:CreateImportFrame() end
   local existing = TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""
   self.importFrame.input:SetText(existing)
+  self.importFrame.input:ClearFocus()
+  if self.importFrame.inputScroll and self.importFrame.inputScroll.SetVerticalScroll then
+    self.importFrame.inputScroll:SetVerticalScroll(0)
+  end
   SetButtonEnabled(self.importFrame.submit, trim(existing) ~= "")
   self.importFrame:Show()
 end
@@ -248,12 +252,19 @@ function TC:CreateImportFrame()
   bg:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
   bg:SetBackdropColor(0,0,0,0.85)
 
-  local edit = CreateFrame("EditBox", "TacticaCompositionImportEdit", bg)
+  local scroll = CreateFrame("ScrollFrame", "TacticaCompositionImportScroll", bg, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", bg, "TOPLEFT", 8, -8)
+  scroll:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", -28, 8)
+
+  local edit = CreateFrame("EditBox", "TacticaCompositionImportEdit", scroll)
   edit:SetMultiLine(true)
   edit:SetFontObject(ChatFontNormal)
-  edit:SetWidth(668); edit:SetHeight(328)
-  edit:SetPoint("TOPLEFT", bg, "TOPLEFT", 14, -14)
+  edit:SetWidth(660)
+  edit:SetHeight(320)
+  edit:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, 0)
   edit:SetAutoFocus(false)
+  edit:EnableMouse(true)
+  scroll:SetScrollChild(edit)
 
   local submit = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   submit:SetWidth(120); submit:SetHeight(24)
@@ -266,8 +277,20 @@ function TC:CreateImportFrame()
   cancel:SetPoint("LEFT", submit, "RIGHT", 16, 0)
   cancel:SetText("Cancel")
 
+  bg:SetScript("OnMouseDown", function()
+    edit:SetFocus()
+  end)
+  scroll:SetScript("OnMouseDown", function()
+    edit:SetFocus()
+  end)
+
   cancel:SetScript("OnClick", function() f:Hide() end)
   edit:SetScript("OnTextChanged", function()
+    local lines = edit:GetNumberOfLines() or 1
+    local minH = 320
+    local targetH = lines * 14 + 16
+    if targetH < minH then targetH = minH end
+    edit:SetHeight(targetH)
     SetButtonEnabled(submit, trim(edit:GetText()) ~= "")
   end)
   submit:SetScript("OnClick", function()
@@ -282,6 +305,7 @@ function TC:CreateImportFrame()
   end)
 
   f.input = edit
+  f.inputScroll = scroll
   f.submit = submit
   self.importFrame = f
 end
