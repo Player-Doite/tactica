@@ -18,7 +18,10 @@ local function EnsureDB()
 end
 
 local function trim(s)
-  return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+  local v = tostring(s or "")
+  v = string.gsub(v, "^%s+", "")
+  v = string.gsub(v, "%s+$", "")
+  return v
 end
 
 local function lower(s) return string.lower(tostring(s or "")) end
@@ -71,7 +74,7 @@ local function roleFromSlot(slot)
 end
 
 local function hexToRGB(hex)
-  hex = tostring(hex or ""):gsub("#", "")
+  hex = string.gsub(tostring(hex or ""), "#", "")
   if string.len(hex) ~= 6 then return 1,1,1 end
   local r = tonumber(string.sub(hex,1,2), 16) or 255
   local g = tonumber(string.sub(hex,3,4), 16) or 255
