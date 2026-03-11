@@ -406,11 +406,14 @@ local function InitializeSavedVariables()
 	  TacticaDB.Settings.ExportFormat = "name_class_role"
 	end
 
+<<<<<<< doite/add-minimap-button-and-dropdown-to-export
 	-- Default export labels mode (Include labels)
 	if TacticaDB.Settings.ExportIncludeLabels == nil then
 	  TacticaDB.Settings.ExportIncludeLabels = true
 	end
 
+=======
+>>>>>>> added
 	-- Default: whisper confirmations on role change (ON)
 	if TacticaDB.Settings.RoleWhisperEnabled == nil then
 	  TacticaDB.Settings.RoleWhisperEnabled = true
@@ -459,6 +462,7 @@ local function TacticaGetExportFormat()
     return opt
 end
 
+<<<<<<< doite/add-minimap-button-and-dropdown-to-export
 local TacticaExportLabelOptions = {
     { value = false, text = "No labels" },
     { value = true,  text = "Include labels" },
@@ -480,6 +484,8 @@ local function TacticaGetExportLabelText(includeLabels)
     return "No labels"
 end
 
+=======
+>>>>>>> added
 f:SetScript("OnEvent", function()
     if event == "ADDON_LOADED" and arg1 == "Tactica" then
         InitializeSavedVariables()
@@ -1206,11 +1212,15 @@ function Tactica:ShowExportRolesFrame()
         local formatOpt = TacticaGetExportFormat()
 
         -- Generate TSV data (tab-separated for Google Sheets)
+<<<<<<< doite/add-minimap-button-and-dropdown-to-export
         local includeLabels = TacticaGetExportIncludeLabels()
         local tsvLines = {}
         if includeLabels then
             table.insert(tsvLines, formatOpt.header)
         end
+=======
+        local tsvLines = { formatOpt.header }
+>>>>>>> added
         local total = (GetNumRaidMembers and GetNumRaidMembers()) or 0
         local T = (TacticaDB and TacticaDB.Tanks) or {}
         local H = (TacticaDB and TacticaDB.Healers) or {}
@@ -1327,6 +1337,7 @@ function Tactica:ShowExportRolesFrame()
         editBox:SetScript("OnEscapePressed", function() f:Hide() end)
         scrollFrame:SetScrollChild(editBox)
 
+<<<<<<< doite/add-minimap-button-and-dropdown-to-export
         -- Top-right close button (X)
         local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
         closeButton:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
@@ -1334,11 +1345,28 @@ function Tactica:ShowExportRolesFrame()
         -- Output format dropdown row
         local outputLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         outputLabel:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 20, 23)
+=======
+        -- Close button
+        local closeBtn = CreateFrame("Button", nil, f, "GameMenuButtonTemplate")
+        closeBtn:SetWidth(100)
+        closeBtn:SetHeight(25)
+        closeBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 20)
+        closeBtn:SetText("Close")
+        closeBtn:SetScript("OnClick", function() f:Hide() end)
+
+        -- Output format dropdown
+        local outputLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        outputLabel:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 26, 50)
+>>>>>>> added
         outputLabel:SetText("Output:")
 
         local outputDrop = CreateFrame("Frame", "TacticaExportOutputDropdown", f, "UIDropDownMenuTemplate")
         outputDrop:SetPoint("LEFT", outputLabel, "RIGHT", -10, 0)
+<<<<<<< doite/add-minimap-button-and-dropdown-to-export
         UIDropDownMenu_SetWidth(145, outputDrop)
+=======
+        UIDropDownMenu_SetWidth(165, outputDrop)
+>>>>>>> added
 
         UIDropDownMenu_Initialize(outputDrop, function()
             local _, opt
@@ -1359,6 +1387,7 @@ function Tactica:ShowExportRolesFrame()
             end
         end)
 
+<<<<<<< doite/add-minimap-button-and-dropdown-to-export
         local labelsLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         labelsLabel:SetPoint("LEFT", outputDrop, "RIGHT", -2, 0)
         labelsLabel:SetText("Label:")
@@ -1390,11 +1419,19 @@ function Tactica:ShowExportRolesFrame()
         self.exportEditBox = editBox
         self.exportOutputDropdown = outputDrop
         self.exportLabelsDropdown = labelsDrop
+=======
+        self.exportFrame = f
+        self.exportEditBox = editBox
+        self.exportOutputDropdown = outputDrop
+>>>>>>> added
     end
 
     local currentOpt = TacticaGetExportFormat()
     UIDropDownMenu_SetText(currentOpt.text, self.exportOutputDropdown)
+<<<<<<< doite/add-minimap-button-and-dropdown-to-export
     UIDropDownMenu_SetText(TacticaGetExportLabelText(TacticaGetExportIncludeLabels()), self.exportLabelsDropdown)
+=======
+>>>>>>> added
     FillExportData()
 
     -- Show the frame
