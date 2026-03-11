@@ -26,6 +26,12 @@ end
 
 local function lower(s) return string.lower(tostring(s or "")) end
 
+local function countLines(text)
+  local s = tostring(text or "")
+  local _, n = string.gsub(s, "\n", "\n")
+  return (n or 0) + 1
+end
+
 local function splitDiscordCandidates(name)
   local out, seen = {}, {}
   local raw = tostring(name or "")
@@ -277,16 +283,33 @@ function TC:CreateImportFrame()
   cancel:SetPoint("LEFT", submit, "RIGHT", 16, 0)
   cancel:SetText("Cancel")
 
-  bg:SetScript("OnMouseDown", function()
+  bg:EnableMouse(true)
+  scroll:EnableMouse(true)
+  scroll:EnableMouseWheel(true)
+
+  local function FocusImportEdit()
     edit:SetFocus()
-  end)
-  scroll:SetScript("OnMouseDown", function()
-    edit:SetFocus()
+  end
+
+  bg:SetScript("OnMouseDown", FocusImportEdit)
+  scroll:SetScript("OnMouseDown", FocusImportEdit)
+  edit:SetScript("OnMouseDown", FocusImportEdit)
+
+  scroll:SetScript("OnMouseWheel", function()
+    local cur = scroll:GetVerticalScroll() or 0
+    local step = 40
+    if arg1 and arg1 > 0 then
+      cur = cur - step
+      if cur < 0 then cur = 0 end
+    else
+      cur = cur + step
+    end
+    scroll:SetVerticalScroll(cur)
   end)
 
   cancel:SetScript("OnClick", function() f:Hide() end)
   edit:SetScript("OnTextChanged", function()
-    local lines = edit:GetNumberOfLines() or 1
+    local lines = countLines(edit:GetText())
     local minH = 320
     local targetH = lines * 14 + 16
     if targetH < minH then targetH = minH end
