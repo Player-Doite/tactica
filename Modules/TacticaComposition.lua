@@ -770,21 +770,41 @@ function TC:RefreshSetupFrame()
 
   local function effectiveFor(key)
     local d = defaults[key]
-    if not d then return "", "X" end
     local ov = self.setupOverrides[key]
+
+    local function raidText(name)
+      local st = members[lower(name or "")] and "R" or "X"
+      local role = getAssignedRoleLetter(name or "")
+      local cr, cg, cb = getClassColorForName(name or "")
+      if not cr then cr, cg, cb = 0.70, 0.70, 0.70 end
+      local txt = string.format("(%s) |cff%02x%02x%02x%s|r - %s%s|r", role, math.floor(cr*255), math.floor(cg*255), math.floor(cb*255), tostring(name or ""), statusColor(st), st)
+      return txt, st
+    end
+
+    local function emptyText()
+      return "(?) |cffb0b0b0- Empty -|r - |cffff5555X|r", "X"
+    end
+
+    if not d then
+      if not ov then return emptyText() end
+      if ov.kind == "raid" then return raidText(ov.name or "") end
+      if ov.kind == "empty" then return emptyText() end
+      if ov.kind == "slot" and defaults[ov.sourceKey] then
+        local src = defaults[ov.sourceKey]
+        local txt = "("..src.role..") "..colorizedName(src.slot, src.name).." - "..statusColor(src.status)..src.status.."|r"
+        return txt, src.status
+      end
+      return emptyText()
+    end
+
     if not ov then
       return defaultText(d), d.status
     end
 
     if ov.kind == "raid" then
-      local st = members[lower(ov.name or "")] and "R" or "X"
-      local role = getAssignedRoleLetter(ov.name or "")
-      local cr, cg, cb = getClassColorForName(ov.name or "")
-      if not cr then cr, cg, cb = 0.24, 0.53, 1.0 end
-      local txt = string.format("(%s) |cff%02x%02x%02x%s|r - %s%s|r", role, math.floor(cr*255), math.floor(cg*255), math.floor(cb*255), tostring(ov.name or ""), statusColor(st), st)
-      return txt, st
+      return raidText(ov.name or "")
     elseif ov.kind == "empty" then
-      return "(?) - Empty - |cffff5555X|r", "X"
+      return emptyText()
     elseif ov.kind == "slot" and defaults[ov.sourceKey] then
       local src = defaults[ov.sourceKey]
       local txt = "("..src.role..") "..colorizedName(src.slot, src.name).." - "..statusColor(src.status)..src.status.."|r"
@@ -800,13 +820,8 @@ function TC:RefreshSetupFrame()
       local key = g..":"..sidx
       local slotUI = f.groupSlots[g] and f.groupSlots[g][sidx]
       if slotUI then
-        local d = defaults[key]
-        if d then
-          local txt = effectiveFor(key)
-          slotUI.label:SetText(txt)
-        else
-          slotUI.label:SetText("-")
-        end
+        local txt = effectiveFor(key)
+        slotUI.label:SetText(txt)
 
         UIDropDownMenu_Initialize(slotUI.dd, function()
           local info = UIDropDownMenu_CreateInfo()
@@ -899,14 +914,16 @@ function TC:CreateSetupFrame()
 
   f.groupSlots = {}
   local groupW, groupH = 370, 123
-  local colGap, rowGap = 14, 10
+  local colGap, rowGap = 14, 5
+  local rowOffset = { 10, 15, 30, 45 }
   local g
   for g=1,8 do
     local col = math.mod((g-1), 2)
     local row = math.floor((g-1) / 2)
     local gf = CreateFrame("Frame", nil, content)
     gf:SetWidth(groupW); gf:SetHeight(groupH)
-    gf:SetPoint("TOPLEFT", content, "TOPLEFT", col * (groupW + colGap), -(row * (groupH + rowGap)))
+    local yoff = (row * (groupH + rowGap)) + (rowOffset[row+1] or 10)
+    gf:SetPoint("TOPLEFT", content, "TOPLEFT", col * (groupW + colGap), -yoff)
     gf:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
     gf:SetBackdropColor(0,0,0,0.45)
 
