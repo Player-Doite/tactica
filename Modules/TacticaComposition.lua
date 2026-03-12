@@ -1342,12 +1342,16 @@ function TC:CreateSetupFrame()
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
-  local content = CreateFrame("Frame", nil, f)
-  content:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -52)
-  content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 54)
+  local scroll = CreateFrame("ScrollFrame", "TacticaCompositionSetupScrollFrame", f, "UIPanelScrollFrameTemplate")
+  scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -46)
+  scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 48)
+
+  local content = CreateFrame("Frame", nil, scroll)
+  content:SetWidth(1); content:SetHeight(1)
+  scroll:SetScrollChild(content)
 
   f.groupSlots = {}
-  local groupW, groupH = 370, 123
+  local groupW, groupH = 364, 123
   local colGap, rowGap = 14, 5
   local topOffset = 2
   local g
@@ -1386,6 +1390,12 @@ function TC:CreateSetupFrame()
       f.groupSlots[g][sidx] = { frame=rowf, label=label, dd=dd }
     end
   end
+
+  local totalRows = 4
+  local totalW = (groupW * 2) + colGap
+  local totalH = topOffset + (totalRows * groupH) + ((totalRows - 1) * rowGap)
+  content:SetWidth(totalW)
+  content:SetHeight(totalH + 8)
 
   local btnImport = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnImport:SetWidth(130); btnImport:SetHeight(24)
