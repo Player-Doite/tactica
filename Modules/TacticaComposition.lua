@@ -1347,11 +1347,12 @@ function TC:CreateSetupFrame()
   scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 48)
 
   local content = CreateFrame("Frame", nil, scroll)
-  content:SetWidth(1); content:SetHeight(1)
+  content:SetPoint("TOPLEFT", scroll, "TOPLEFT", 0, 0)
+  content:SetWidth(728); content:SetHeight(1)
   scroll:SetScrollChild(content)
 
   f.groupSlots = {}
-  local groupW, groupH = 364, 123
+  local groupW, groupH = 357, 123
   local colGap, rowGap = 14, 5
   local topOffset = 2
   local g
