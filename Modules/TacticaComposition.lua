@@ -71,6 +71,52 @@ local function getRaidMemberNamesLower()
   return set
 end
 
+local function getAssignedRoleLetter(name)
+  if not TacticaDB then return "?" end
+  if TacticaDB.Tanks and TacticaDB.Tanks[name] then return "T" end
+  if TacticaDB.Healers and TacticaDB.Healers[name] then return "H" end
+  if TacticaDB.DPS and TacticaDB.DPS[name] then return "D" end
+
+  local ln = lower(name)
+  local n, v
+  if TacticaDB.Tanks then for n, v in pairs(TacticaDB.Tanks) do if v and lower(n) == ln then return "T" end end end
+  if TacticaDB.Healers then for n, v in pairs(TacticaDB.Healers) do if v and lower(n) == ln then return "H" end end end
+  if TacticaDB.DPS then for n, v in pairs(TacticaDB.DPS) do if v and lower(n) == ln then return "D" end end end
+  return "?"
+end
+
+local function getClassColorForName(name)
+  local ln = lower(name)
+  local function unitColor(unit)
+    if not (UnitExists and UnitExists(unit)) then return nil end
+    local nm = UnitName and UnitName(unit)
+    if not nm or lower(nm) ~= ln then return nil end
+    local _, classFile = UnitClass and UnitClass(unit)
+    if classFile and RAID_CLASS_COLORS and RAID_CLASS_COLORS[classFile] then
+      local c = RAID_CLASS_COLORS[classFile]
+      return c.r or 1, c.g or 1, c.b or 1
+    end
+    return nil
+  end
+
+  local r,g,b
+  if UnitInRaid and UnitInRaid("player") then
+    local i
+    for i=1,40 do
+      r,g,b = unitColor("raid"..i)
+      if r then return r,g,b end
+    end
+  end
+  r,g,b = unitColor("player"); if r then return r,g,b end
+  local pn = (GetNumPartyMembers and GetNumPartyMembers()) or 0
+  local i
+  for i=1,pn do
+    r,g,b = unitColor("party"..i)
+    if r then return r,g,b end
+  end
+  return nil
+end
+
 local function roleFromSlot(slot)
   local classN = lower(slot.className)
   local specN = lower(slot.specName)
@@ -732,7 +778,10 @@ function TC:RefreshSetupFrame()
 
     if ov.kind == "raid" then
       local st = members[lower(ov.name or "")] and "R" or "X"
-      local txt = "(?) "..colorizedName(d.slot, ov.name or "").." - "..statusColor(st)..st.."|r"
+      local role = getAssignedRoleLetter(ov.name or "")
+      local cr, cg, cb = getClassColorForName(ov.name or "")
+      if not cr then cr, cg, cb = 0.24, 0.53, 1.0 end
+      local txt = string.format("(%s) |cff%02x%02x%02x%s|r - %s%s|r", role, math.floor(cr*255), math.floor(cg*255), math.floor(cb*255), tostring(ov.name or ""), statusColor(st), st)
       return txt, st
     elseif ov.kind == "empty" then
       return "(?) - Empty - |cffff5555X|r", "X"
@@ -849,7 +898,7 @@ function TC:CreateSetupFrame()
   content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 54)
 
   f.groupSlots = {}
-  local groupW, groupH = 370, 118
+  local groupW, groupH = 370, 123
   local colGap, rowGap = 14, 10
   local g
   for g=1,8 do
@@ -918,14 +967,25 @@ local _wasInRaid = false
 local ev = CreateFrame("Frame")
 ev:RegisterEvent("PLAYER_LOGIN")
 ev:RegisterEvent("RAID_ROSTER_UPDATE")
+ev:RegisterEvent("PARTY_MEMBERS_CHANGED")
+ev:RegisterEvent("PARTY_LEADER_CHANGED")
+ev:RegisterEvent("CHAT_MSG_ADDON")
 ev:SetScript("OnEvent", function()
   EnsureDB()
+  if event == "CHAT_MSG_ADDON" then
+    if arg1 == "TACTICA" then
+      if TC.viewFrame and TC.viewFrame:IsShown() then TC:RefreshCompositionRows() end
+      if TC.setupFrame and TC.setupFrame:IsShown() then TC:RefreshSetupFrame() end
+    end
+    return
+  end
+
   if event == "PLAYER_LOGIN" then
     _wasInRaid = UnitInRaid and UnitInRaid("player") and true or false
     return
   end
 
-  if event == "RAID_ROSTER_UPDATE" then
+  if event == "RAID_ROSTER_UPDATE" or event == "PARTY_MEMBERS_CHANGED" or event == "PARTY_LEADER_CHANGED" then
     local inRaid = UnitInRaid and UnitInRaid("player") and true or false
     if _wasInRaid and (not inRaid) then
       TacticaDB.Composition.current = nil
