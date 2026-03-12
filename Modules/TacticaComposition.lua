@@ -16,6 +16,20 @@ local function EnsureDB()
   TacticaDB.Composition = TacticaDB.Composition or {}
   TacticaDB.Composition.current = TacticaDB.Composition.current or nil -- session-only, cleared when leaving raid
   TacticaDB.Composition.nameMap = TacticaDB.Composition.nameMap or {} -- persistent discordName -> { alias=true }
+  TacticaDB.Composition.setupOverrides = TacticaDB.Composition.setupOverrides or {} -- session-only, cleared when leaving raid
+end
+
+local function GetSetupOverrides()
+  EnsureDB()
+  TacticaDB.Composition.setupOverrides = TacticaDB.Composition.setupOverrides or {}
+  if TC then TC.setupOverrides = TacticaDB.Composition.setupOverrides end
+  return TacticaDB.Composition.setupOverrides
+end
+
+local function ResetSetupOverrides()
+  EnsureDB()
+  TacticaDB.Composition.setupOverrides = {}
+  if TC then TC.setupOverrides = TacticaDB.Composition.setupOverrides end
 end
 
 local function trim(s)
@@ -220,7 +234,7 @@ local function ParseAndStoreCurrent(raw)
     return nil
   end
   TacticaDB.Composition.current = parsed
-  if TC then TC.setupOverrides = {} end
+  ResetSetupOverrides()
   return parsed
 end
 
@@ -328,7 +342,7 @@ function TC:BuildDesiredGroups()
     end
   end
 
-  self.setupOverrides = self.setupOverrides or {}
+  self.setupOverrides = GetSetupOverrides()
 
   local function effectiveNameFor(key)
     local ov = self.setupOverrides[key]
@@ -1021,11 +1035,85 @@ function TC:RefreshSetupFrame()
   local data = TacticaDB and TacticaDB.Composition and TacticaDB.Composition.current
   if not data then return end
 
-  self.setupOverrides = self.setupOverrides or {}
-
+  self.setupOverrides = GetSetupOverrides()
   local members = getRaidMemberNamesLower()
   local defaults = {}
   local matchedLower = {}
+
+  local orderedKeys = {}
+  local gg, ss
+  for gg=1,8 do
+    for ss=1,5 do
+      table.insert(orderedKeys, gg..":"..ss)
+    end
+  end
+
+  local function normalizeOverrides()
+    local usedRaid = {}
+    local usedSlotSource = {}
+    local changed = false
+
+    local _, key
+    for _, key in ipairs(orderedKeys) do
+      local ov = self.setupOverrides[key]
+      if ov then
+        if ov.kind == "slot" then
+          if ov.sourceKey == key or not defaults[ov.sourceKey] or usedSlotSource[ov.sourceKey] then
+            self.setupOverrides[key] = nil
+            changed = true
+          else
+            usedSlotSource[ov.sourceKey] = true
+          end
+        elseif ov.kind == "raid" then
+          local lk = lower(ov.name or "")
+          if lk == "" or not members[lk] or usedRaid[lk] then
+            self.setupOverrides[key] = nil
+            changed = true
+          else
+            usedRaid[lk] = true
+          end
+        elseif ov.kind ~= "empty" then
+          self.setupOverrides[key] = nil
+          changed = true
+        end
+      end
+    end
+
+    if changed then
+      TacticaDB.Composition.setupOverrides = self.setupOverrides
+    end
+  end
+
+  local function setOverrideForKey(targetKey, ov)
+    local k
+    if ov and ov.kind == "slot" and ov.sourceKey then
+      for k,_ in pairs(self.setupOverrides) do
+        if k ~= targetKey then
+          local other = self.setupOverrides[k]
+          if other and other.kind == "slot" and other.sourceKey == ov.sourceKey then
+            self.setupOverrides[k] = nil
+          end
+        end
+      end
+    elseif ov and ov.kind == "raid" and ov.name then
+      local lk = lower(ov.name)
+      for k,_ in pairs(self.setupOverrides) do
+        if k ~= targetKey then
+          local other = self.setupOverrides[k]
+          if other and other.kind == "raid" and lower(other.name or "") == lk then
+            self.setupOverrides[k] = nil
+          end
+        end
+      end
+    end
+
+    if ov then
+      self.setupOverrides[targetKey] = ov
+    else
+      self.setupOverrides[targetKey] = nil
+    end
+    TacticaDB.Composition.setupOverrides = self.setupOverrides
+  end
 
   local i
   for i=1,table.getn(data.slots) do
@@ -1061,6 +1149,8 @@ function TC:RefreshSetupFrame()
     end
   end
 
+  normalizeOverrides()
+
   local raidUnlisted = {}
   for k, nm in pairs(members) do
     if not matchedLower[k] then table.insert(raidUnlisted, nm) end
@@ -1085,7 +1175,6 @@ function TC:RefreshSetupFrame()
 
   -- pool contains raid-unlisted + displaced defaults from overridden slots
   local pool = {}
-  local used = {}
   for i=1,table.getn(raidUnlisted) do
     local nm = raidUnlisted[i]
     local id = "raid:"..lower(nm)
@@ -1097,7 +1186,6 @@ function TC:RefreshSetupFrame()
       local d = defaults[key]
       local id = "slot:"..key
       pool[id] = { id=id, kind="slot", sourceKey=key, role=d.role, name=d.name, slot=d.slot, status=d.status, text=defaultText(d) }
-      used[id] = true
     end
   end
 
@@ -1157,11 +1245,21 @@ function TC:RefreshSetupFrame()
         slotUI.label:SetText(txt)
 
         UIDropDownMenu_Initialize(slotUI.dd, function()
+          local usedRaidByOthers = {}
+          local usedSlotByOthers = {}
+          local k2, ov2
+          for k2, ov2 in pairs(self.setupOverrides) do
+            if k2 ~= key and ov2 then
+              if ov2.kind == "raid" then usedRaidByOthers[lower(ov2.name or "")] = true end
+              if ov2.kind == "slot" then usedSlotByOthers[ov2.sourceKey or ""] = true end
+            end
+          end
+
           local info = UIDropDownMenu_CreateInfo()
           info.text = "Default"
           info.notCheckable = 1
           info.func = function()
-            self.setupOverrides[key] = nil
+            setOverrideForKey(key, nil)
             UIDropDownMenu_SetText("Default", slotUI.dd)
             self:RefreshSetupFrame()
           end
@@ -1171,35 +1269,38 @@ function TC:RefreshSetupFrame()
           ei.text = "- Empty -"
           ei.notCheckable = 1
           ei.func = function()
-            self.setupOverrides[key] = { kind="empty" }
+            setOverrideForKey(key, { kind="empty" })
             UIDropDownMenu_SetText("Empty", slotUI.dd)
             self:RefreshSetupFrame()
           end
           UIDropDownMenu_AddButton(ei)
 
           for _, nm in ipairs(raidUnlisted) do
-            local picked = nm
-            local ri = UIDropDownMenu_CreateInfo()
-            ri.text = "Use: "..picked
-            ri.notCheckable = 1
-            ri.func = function()
-              self.setupOverrides[key] = { kind="raid", name=picked }
-              UIDropDownMenu_SetText("Other", slotUI.dd)
-              self:RefreshSetupFrame()
+            local lk = lower(nm)
+            if not usedRaidByOthers[lk] then
+              local picked = nm
+              local ri = UIDropDownMenu_CreateInfo()
+              ri.text = "Use: "..picked
+              ri.notCheckable = 1
+              ri.func = function()
+                setOverrideForKey(key, { kind="raid", name=picked })
+                UIDropDownMenu_SetText("Other", slotUI.dd)
+                self:RefreshSetupFrame()
+              end
+              UIDropDownMenu_AddButton(ri)
             end
-            UIDropDownMenu_AddButton(ri)
           end
 
           local k, entry
           for k, entry in pairs(pool) do
-            if entry and entry.kind == "slot" and entry.sourceKey and entry.sourceKey ~= key then
+            if entry and entry.kind == "slot" and entry.sourceKey and entry.sourceKey ~= key and (not usedSlotByOthers[entry.sourceKey]) then
               local sourceKey = entry.sourceKey
               local sourceText = entry.text
               local si = UIDropDownMenu_CreateInfo()
               si.text = "Use: "..sourceText
               si.notCheckable = 1
               si.func = function()
-                self.setupOverrides[key] = { kind="slot", sourceKey=sourceKey }
+                setOverrideForKey(key, { kind="slot", sourceKey=sourceKey })
                 UIDropDownMenu_SetText("from "..sourceKey, slotUI.dd)
                 self:RefreshSetupFrame()
               end
@@ -1365,7 +1466,7 @@ ev:SetScript("OnEvent", function()
       if TC.viewFrame then TC.viewFrame:Hide() end
       if TC.importFrame then TC.importFrame:Hide() end
       if TC.setupFrame then TC.setupFrame:Hide() end
-      TC.setupOverrides = {}
+      ResetSetupOverrides()
     end
     _wasInRaid = inRaid
     if TC.viewFrame and TC.viewFrame:IsShown() then
