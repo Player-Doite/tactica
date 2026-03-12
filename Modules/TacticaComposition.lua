@@ -2,6 +2,7 @@
 
 TacticaComposition = TacticaComposition or {}
 local TC = TacticaComposition
+local FindAutoMatch
 
 local TITLE_R, TITLE_G, TITLE_B = 0.2, 1.0, 0.6
 
@@ -519,7 +520,7 @@ local function ClearAliases(discordName)
   TacticaDB.Composition.nameMap[discordName] = nil
 end
 
-local function FindAutoMatch(discordName)
+FindAutoMatch = function(discordName)
   local raidNames = getRaidMemberNamesLower()
   local aliases = BuildAliasList(discordName)
   local i
