@@ -608,12 +608,19 @@ function TC:CreateImportFrame()
   sub:SetText("Import JSON export from Raid-Helper's Composition Tool, after you have arranged all groups.")
   sub:SetTextColor(1,1,1)
 
+  local sep = f:CreateTexture(nil, "ARTWORK")
+  sep:SetHeight(1)
+  sep:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -74)
+  sep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -74)
+  sep:SetTexture(1, 1, 1)
+  if sep.SetVertexColor then sep:SetVertexColor(1, 1, 1, 0.25) end
+
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
   local bg = CreateFrame("Frame", nil, f)
   bg:SetWidth(700); bg:SetHeight(360)
-  bg:SetPoint("TOP", f, "TOP", 0, -92)
+  bg:SetPoint("TOP", f, "TOP", 0, -102)
   bg:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
   bg:SetBackdropColor(0,0,0,0.85)
 
@@ -951,11 +958,25 @@ function TC:CreateCompositionFrame()
   title:SetText("TACTICA COMPOSITION TOOL - 2/3. Matching")
   title:SetTextColor(TITLE_R, TITLE_G, TITLE_B)
 
+  local sub = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
+  sub:SetWidth(740)
+  sub:SetJustifyH("LEFT")
+  sub:SetText("When a joining player's name fully or partly matches a Discord name, it is suggested in the field. Press Add to confirm a mapping, and add multiple names for one Discord entry when needed.")
+  sub:SetTextColor(1,1,1)
+
+  local sep = f:CreateTexture(nil, "ARTWORK")
+  sep:SetHeight(1)
+  sep:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -82)
+  sep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -82)
+  sep:SetTexture(1, 1, 1)
+  if sep.SetVertexColor then sep:SetVertexColor(1, 1, 1, 0.25) end
+
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
   local scroll = CreateFrame("ScrollFrame", "TacticaCompositionViewScrollFrame", f, "UIPanelScrollFrameTemplate")
-  scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -46)
+  scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -94)
   scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 48)
 
   local content = CreateFrame("Frame", nil, scroll)
@@ -1339,11 +1360,25 @@ function TC:CreateSetupFrame()
   title:SetText("TACTICA COMPOSITION TOOL - 3/3. Setup")
   title:SetTextColor(TITLE_R, TITLE_G, TITLE_B)
 
+  local sub = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  sub:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
+  sub:SetWidth(740)
+  sub:SetJustifyH("LEFT")
+  sub:SetText("Allocate all unlisted or unmatched players into groups. When your layout looks correct, press Sort groups to apply it to the live raid roster.")
+  sub:SetTextColor(1,1,1)
+
+  local sep = f:CreateTexture(nil, "ARTWORK")
+  sep:SetHeight(1)
+  sep:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -82)
+  sep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -82)
+  sep:SetTexture(1, 1, 1)
+  if sep.SetVertexColor then sep:SetVertexColor(1, 1, 1, 0.25) end
+
   local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
   local scroll = CreateFrame("ScrollFrame", "TacticaCompositionSetupScrollFrame", f, "UIPanelScrollFrameTemplate")
-  scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -46)
+  scroll:SetPoint("TOPLEFT", f, "TOPLEFT", 16, -94)
   scroll:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -34, 48)
 
   local content = CreateFrame("Frame", nil, scroll)
@@ -1385,7 +1420,7 @@ function TC:CreateSetupFrame()
       label:SetText("-")
 
       local dd = CreateFrame("Frame", "TacticaCompositionSetupDropDownG"..g.."S"..sidx, rowf, "UIDropDownMenuTemplate")
-      dd:SetPoint("LEFT", label, "RIGHT", -22, -2)
+      dd:SetPoint("LEFT", label, "RIGHT", -32, -2)
       UIDropDownMenu_SetWidth(96, dd)
 
       f.groupSlots[g][sidx] = { frame=rowf, label=label, dd=dd }
