@@ -276,6 +276,226 @@ local function OpenKeywordInvite()
   cfmsg("Auto-Invite module is unavailable.")
 end
 
+local function CanManageRaidSubgroups()
+  if IsRaidLeader and IsRaidLeader() then return true end
+  if IsRaidOfficer and IsRaidOfficer() then return true end
+  if IsRaidAssistant and IsRaidAssistant() then return true end
+  if IsPartyLeader and IsPartyLeader() then return true end
+  return false
+end
+
+local function BuildRaidRosterLookup()
+  local byLower = {}
+  local members = {}
+  local n = (GetNumRaidMembers and GetNumRaidMembers()) or 0
+  local i
+  for i=1,n do
+    local name, _, subgroup = GetRaidRosterInfo(i)
+    if name and name ~= "" then
+      local entry = { index = i, name = name, subgroup = tonumber(subgroup) or 0 }
+      byLower[lower(name)] = entry
+      table.insert(members, entry)
+    end
+  end
+  return byLower, members
+end
+
+function TC:BuildDesiredGroups()
+  EnsureDB()
+  local data = TacticaDB and TacticaDB.Composition and TacticaDB.Composition.current
+  local desired = {}
+  local seen = {}
+  local g
+  for g=1,8 do desired[g] = {} end
+  if not data then return desired end
+
+  local members = getRaidMemberNamesLower()
+  local defaults = {}
+  local i
+  for i=1,table.getn(data.slots) do
+    local slot = data.slots[i]
+    local sg = tonumber(slot.groupNumber) or 0
+    local sidx = tonumber(slot.slotNumber) or 0
+    if sg >= 1 and sg <= 8 and sidx >= 1 and sidx <= 5 then
+      local key = sg..":"..sidx
+      local autoName = FindAutoMatch(slot.name)
+      if autoName and members[lower(autoName)] then
+        defaults[key] = autoName
+      else
+        defaults[key] = slot.name
+      end
+    end
+  end
+
+  self.setupOverrides = self.setupOverrides or {}
+
+  local function effectiveNameFor(key)
+    local ov = self.setupOverrides[key]
+    if ov and ov.kind == "empty" then return nil end
+    if ov and ov.kind == "raid" then return ov.name end
+    if ov and ov.kind == "slot" then return defaults[ov.sourceKey] end
+    return defaults[key]
+  end
+
+  for g=1,8 do
+    local sidx
+    for sidx=1,5 do
+      local key = g..":"..sidx
+      local nm = effectiveNameFor(key)
+      if nm and nm ~= "" then
+        local raidName = members[lower(nm)]
+        if raidName then
+          local lk = lower(raidName)
+          if not seen[lk] then
+            table.insert(desired[g], raidName)
+            seen[lk] = true
+          end
+        end
+      end
+    end
+  end
+
+  return desired
+end
+
+function TC:SortRaidToSetupGroups()
+  if not (UnitInRaid and UnitInRaid("player")) then
+    cfmsg("You must be in a raid to sort groups.")
+    return
+  end
+  if not CanManageRaidSubgroups() then
+    cfmsg("Only raid leader/assist can sort groups.")
+    return
+  end
+
+  local desired = self:BuildDesiredGroups()
+  local plannedByLower = {}
+  local plannedGroups = {}
+  local g
+  for g=1,8 do
+    plannedGroups[g] = table.getn(desired[g]) > 0
+    local i
+    for i=1,table.getn(desired[g]) do
+      plannedByLower[lower(desired[g][i])] = g
+    end
+  end
+
+  local function moveNameToGroup(name, targetGroup)
+    local roster = BuildRaidRosterLookup()
+    local entry = roster[lower(name)]
+    if not entry then return false end
+    if entry.subgroup == targetGroup then return false end
+    SetRaidSubgroup(entry.index, targetGroup)
+    return true
+  end
+
+  local moved = 0
+  for g=1,8 do
+    local i
+    for i=1,table.getn(desired[g]) do
+      if moveNameToGroup(desired[g][i], g) then moved = moved + 1 end
+    end
+  end
+
+  local function groupCounts(members)
+    local counts = {}
+    local i
+    for i=1,8 do counts[i] = 0 end
+    for i=1,table.getn(members) do
+      local sg = tonumber(members[i].subgroup) or 0
+      if sg >= 1 and sg <= 8 then counts[sg] = counts[sg] + 1 end
+    end
+    return counts
+  end
+
+  local function findBestTargetGroup(counts, preferUnplanned)
+    local best = nil
+    local i
+    for i=1,8 do
+      if counts[i] < 5 and ((not preferUnplanned) or (not plannedGroups[i])) then
+        if not best or counts[i] < counts[best] then best = i end
+      end
+    end
+    if best then return best end
+    for i=1,8 do
+      if counts[i] < 5 then
+        if not best or counts[i] < counts[best] then best = i end
+      end
+    end
+    return best
+  end
+
+  local function moveUnplannedOutOfPlannedGroups()
+    local byLower, members = BuildRaidRosterLookup()
+    local counts = groupCounts(members)
+    local i
+    for i=1,table.getn(members) do
+      local m = members[i]
+      local sg = tonumber(m.subgroup) or 0
+      if sg >= 1 and sg <= 8 and plannedGroups[sg] and not plannedByLower[lower(m.name)] then
+        local tgt = findBestTargetGroup(counts, true)
+        if tgt and tgt ~= sg then
+          local current = byLower[lower(m.name)]
+          if current and current.index then
+            SetRaidSubgroup(current.index, tgt)
+            counts[sg] = math.max(0, counts[sg] - 1)
+            counts[tgt] = counts[tgt] + 1
+            moved = moved + 1
+          end
+        end
+      end
+    end
+  end
+
+  local function spillOverfilledGroups()
+    local changed = true
+    local safety = 0
+    while changed and safety < 80 do
+      changed = false
+      safety = safety + 1
+      local byLower, members = BuildRaidRosterLookup()
+      local counts = groupCounts(members)
+
+      local src = nil
+      local i
+      for i=1,8 do if counts[i] > 5 then src = i; break end end
+      if not src then break end
+
+      local tgt = findBestTargetGroup(counts, true)
+      if not tgt or tgt == src then break end
+
+      local candidate = nil
+      for i=1,table.getn(members) do
+        local m = members[i]
+        if tonumber(m.subgroup) == src then
+          if not plannedByLower[lower(m.name)] then
+            candidate = m
+            break
+          end
+          if not candidate then candidate = m end
+        end
+      end
+
+      if candidate then
+        local cur = byLower[lower(candidate.name)]
+        if cur and cur.index then
+          SetRaidSubgroup(cur.index, tgt)
+          moved = moved + 1
+          changed = true
+        end
+      else
+        break
+      end
+    end
+  end
+
+  moveUnplannedOutOfPlannedGroups()
+  spillOverfilledGroups()
+
+  if self.setupFrame and self.setupFrame:IsShown() then self:RefreshSetupFrame() end
+  cfmsg("Sort groups complete. Moves issued: "..tostring(moved)..".")
+end
+
 local function BuildAliasList(discordName)
   EnsureDB()
   local bucket = TacticaDB.Composition.nameMap[discordName] or {}
@@ -341,10 +561,11 @@ function TC:ShowImportFrame()
   end
   local hasInput = trim(existing) ~= ""
   local hasValidInput = HasValidCompositionText(existing)
+  local canSort = hasValidInput and CanManageRaidSubgroups() and (UnitInRaid and UnitInRaid("player"))
   SetButtonEnabled(self.importFrame.submit, hasInput)
   if self.importFrame.btnSetup then SetButtonEnabled(self.importFrame.btnSetup, hasInput) end
   if self.importFrame.btnKeywordInvite then SetAccentButtonEnabled(self.importFrame.btnKeywordInvite, hasValidInput) end
-  if self.importFrame.btnSortRaid then SetAccentButtonEnabled(self.importFrame.btnSortRaid, hasValidInput) end
+  if self.importFrame.btnSortRaid then SetAccentButtonEnabled(self.importFrame.btnSortRaid, canSort) end
   if self.setupFrame then self.setupFrame:Hide() end
   self.importFrame:Show()
   self.importFrame:Raise()
@@ -417,7 +638,7 @@ function TC:CreateImportFrame()
   local btnSortRaid = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnSortRaid:SetWidth(130); btnSortRaid:SetHeight(24)
   btnSortRaid:SetPoint("LEFT", submit, "RIGHT", 6, 0)
-  btnSortRaid:SetText("Sort raid")
+  btnSortRaid:SetText("Sort groups")
   StyleAccentButton(btnSortRaid)
   SetAccentButtonEnabled(btnSortRaid, false)
 
@@ -455,7 +676,9 @@ function TC:CreateImportFrame()
     OpenKeywordInvite()
   end)
   btnSortRaid:SetScript("OnClick", function()
-    -- intentionally unbound for now
+    if not HasValidCompositionText(edit:GetText()) then return end
+    if not ParseAndStoreCurrent(edit:GetText()) then return end
+    TC:SortRaidToSetupGroups()
   end)
   edit:SetScript("OnTextChanged", function()
     local lines = countLines(edit:GetText())
@@ -467,10 +690,11 @@ function TC:CreateImportFrame()
     local current = edit:GetText()
     local hasInput = trim(current) ~= ""
     local hasValidInput = HasValidCompositionText(current)
+    local canSort = hasValidInput and CanManageRaidSubgroups() and (UnitInRaid and UnitInRaid("player"))
     SetButtonEnabled(submit, hasInput)
     SetButtonEnabled(btnSetup, hasInput)
     SetAccentButtonEnabled(btnKeywordInvite, hasValidInput)
-    SetAccentButtonEnabled(btnSortRaid, hasValidInput)
+    SetAccentButtonEnabled(btnSortRaid, canSort)
   end)
   submit:SetScript("OnClick", function()
     if not ParseAndStoreCurrent(edit:GetText()) then return end
@@ -688,6 +912,10 @@ function TC:ShowCompositionFrame()
   if not TacticaDB.Composition.current then self:ShowImportFrame(); return end
   if not self.viewFrame then self:CreateCompositionFrame() end
   self:RefreshCompositionRows()
+  local hasValidCurrent = HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or "")
+  local canSortCurrent = hasValidCurrent and CanManageRaidSubgroups() and (UnitInRaid and UnitInRaid("player"))
+  if self.viewFrame.btnKeywordInvite then SetAccentButtonEnabled(self.viewFrame.btnKeywordInvite, hasValidCurrent) end
+  if self.viewFrame.btnSortRaid then SetAccentButtonEnabled(self.viewFrame.btnSortRaid, canSortCurrent) end
   if self.setupFrame then self.setupFrame:Hide() end
   self.viewFrame:Show()
   self.viewFrame:Raise()
@@ -739,17 +967,19 @@ function TC:CreateCompositionFrame()
   btnKeywordInvite:SetPoint("RIGHT", btnMatching, "LEFT", -6, 0)
   btnKeywordInvite:SetText("Keyword invite")
   StyleAccentButton(btnKeywordInvite)
-  SetAccentButtonEnabled(btnKeywordInvite, HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""))
+  local hasValidCurrent = HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or "")
+  local canSortCurrent = hasValidCurrent and CanManageRaidSubgroups() and (UnitInRaid and UnitInRaid("player"))
+  SetAccentButtonEnabled(btnKeywordInvite, hasValidCurrent)
   btnKeywordInvite:SetScript("OnClick", function() OpenKeywordInvite() end)
 
   local btnSortRaid = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnSortRaid:SetWidth(130); btnSortRaid:SetHeight(24)
   btnSortRaid:SetPoint("LEFT", btnMatching, "RIGHT", 6, 0)
-  btnSortRaid:SetText("Sort raid")
+  btnSortRaid:SetText("Sort groups")
   StyleAccentButton(btnSortRaid)
-  SetAccentButtonEnabled(btnSortRaid, HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""))
+  SetAccentButtonEnabled(btnSortRaid, canSortCurrent)
   btnSortRaid:SetScript("OnClick", function()
-    -- intentionally unbound for now
+    TC:SortRaidToSetupGroups()
   end)
 
   local btnSetup = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
@@ -776,6 +1006,10 @@ function TC:ShowSetupFrame()
   if self.importFrame then self.importFrame:Hide() end
   if self.viewFrame then self.viewFrame:Hide() end
   self:RefreshSetupFrame()
+  local hasValidCurrent = HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or "")
+  local canSortCurrent = hasValidCurrent and CanManageRaidSubgroups() and (UnitInRaid and UnitInRaid("player"))
+  if self.setupFrame.btnKeywordInvite then SetAccentButtonEnabled(self.setupFrame.btnKeywordInvite, hasValidCurrent) end
+  if self.setupFrame.btnSortRaid then SetAccentButtonEnabled(self.setupFrame.btnSortRaid, canSortCurrent) end
   self.setupFrame:Show()
   self.setupFrame:Raise()
 end
@@ -1074,17 +1308,19 @@ function TC:CreateSetupFrame()
   btnKeywordInvite:SetPoint("RIGHT", btnMatching, "LEFT", -6, 0)
   btnKeywordInvite:SetText("Keyword invite")
   StyleAccentButton(btnKeywordInvite)
-  SetAccentButtonEnabled(btnKeywordInvite, HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""))
+  local hasValidCurrent = HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or "")
+  local canSortCurrent = hasValidCurrent and CanManageRaidSubgroups() and (UnitInRaid and UnitInRaid("player"))
+  SetAccentButtonEnabled(btnKeywordInvite, hasValidCurrent)
   btnKeywordInvite:SetScript("OnClick", function() OpenKeywordInvite() end)
 
   local btnSortRaid = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnSortRaid:SetWidth(130); btnSortRaid:SetHeight(24)
   btnSortRaid:SetPoint("LEFT", btnMatching, "RIGHT", 6, 0)
-  btnSortRaid:SetText("Sort raid")
+  btnSortRaid:SetText("Sort groups")
   StyleAccentButton(btnSortRaid)
-  SetAccentButtonEnabled(btnSortRaid, HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""))
+  SetAccentButtonEnabled(btnSortRaid, canSortCurrent)
   btnSortRaid:SetScript("OnClick", function()
-    -- intentionally unbound for now
+    TC:SortRaidToSetupGroups()
   end)
 
   local btnSetup = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
@@ -1133,9 +1369,17 @@ ev:SetScript("OnEvent", function()
     _wasInRaid = inRaid
     if TC.viewFrame and TC.viewFrame:IsShown() then
       TC:RefreshCompositionRows()
+      local hasValidCurrent = HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or "")
+      local canSortCurrent = hasValidCurrent and CanManageRaidSubgroups() and (UnitInRaid and UnitInRaid("player"))
+      if TC.viewFrame.btnKeywordInvite then SetAccentButtonEnabled(TC.viewFrame.btnKeywordInvite, hasValidCurrent) end
+      if TC.viewFrame.btnSortRaid then SetAccentButtonEnabled(TC.viewFrame.btnSortRaid, canSortCurrent) end
     end
     if TC.setupFrame and TC.setupFrame:IsShown() then
       TC:RefreshSetupFrame()
+      local hasValidCurrent = HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or "")
+      local canSortCurrent = hasValidCurrent and CanManageRaidSubgroups() and (UnitInRaid and UnitInRaid("player"))
+      if TC.setupFrame.btnKeywordInvite then SetAccentButtonEnabled(TC.setupFrame.btnKeywordInvite, hasValidCurrent) end
+      if TC.setupFrame.btnSortRaid then SetAccentButtonEnabled(TC.setupFrame.btnSortRaid, canSortCurrent) end
     end
   end
 end)
