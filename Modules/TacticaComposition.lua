@@ -228,6 +228,54 @@ local function SetButtonEnabled(btn, enabled)
   if enabled then btn:Enable() else btn:Disable() end
 end
 
+local function HasValidCompositionText(text)
+  return ParseCompositionJson(text) ~= nil
+end
+
+local function StyleAccentButton(btn)
+  if not btn then return end
+  btn:SetNormalTexture("Interface\\Buttons\\UI-Panel-Button-Up")
+  btn:SetPushedTexture("Interface\\Buttons\\UI-Panel-Button-Down")
+  btn:SetHighlightTexture("Interface\\Buttons\\UI-Panel-Button-Highlight")
+end
+
+local function SetAccentButtonEnabled(btn, enabled)
+  if not btn then return end
+  SetButtonEnabled(btn, enabled)
+
+  local fs = btn:GetFontString()
+  local nt = btn:GetNormalTexture()
+  local pt = btn:GetPushedTexture()
+  local ht = btn:GetHighlightTexture()
+
+  if enabled then
+    if fs and fs.SetTextColor then fs:SetTextColor(0.2, 1.0, 0.2) end
+    if nt and nt.SetVertexColor then nt:SetVertexColor(0.2, 0.8, 0.2) end
+    if pt and pt.SetVertexColor then pt:SetVertexColor(0.2, 0.8, 0.2) end
+    if ht then
+      if ht.SetBlendMode then ht:SetBlendMode("ADD") end
+      if ht.SetVertexColor then ht:SetVertexColor(0.2, 1.0, 0.2) end
+    end
+  else
+    if fs and fs.SetTextColor then fs:SetTextColor(0.5, 0.5, 0.5) end
+    if nt and nt.SetVertexColor then nt:SetVertexColor(0.4, 0.4, 0.4) end
+    if pt and pt.SetVertexColor then pt:SetVertexColor(0.4, 0.4, 0.4) end
+    if ht and ht.SetVertexColor then ht:SetVertexColor(0.4, 0.4, 0.4) end
+  end
+end
+
+local function OpenKeywordInvite()
+  if TacticaInvite and TacticaInvite.Open then
+    TacticaInvite.Open()
+    return
+  end
+  if SlashCmdList and SlashCmdList["TTACTINV"] then
+    SlashCmdList["TTACTINV"]("")
+    return
+  end
+  cfmsg("Auto-Invite module is unavailable.")
+end
+
 local function BuildAliasList(discordName)
   EnsureDB()
   local bucket = TacticaDB.Composition.nameMap[discordName] or {}
@@ -292,8 +340,11 @@ function TC:ShowImportFrame()
     self.importFrame.inputScroll:SetVerticalScroll(0)
   end
   local hasInput = trim(existing) ~= ""
+  local hasValidInput = HasValidCompositionText(existing)
   SetButtonEnabled(self.importFrame.submit, hasInput)
   if self.importFrame.btnSetup then SetButtonEnabled(self.importFrame.btnSetup, hasInput) end
+  if self.importFrame.btnKeywordInvite then SetAccentButtonEnabled(self.importFrame.btnKeywordInvite, hasValidInput) end
+  if self.importFrame.btnSortRaid then SetAccentButtonEnabled(self.importFrame.btnSortRaid, hasValidInput) end
   if self.setupFrame then self.setupFrame:Hide() end
   self.importFrame:Show()
   self.importFrame:Raise()
@@ -356,6 +407,20 @@ function TC:CreateImportFrame()
   submit:SetText("2/3. Matching")
   submit:Disable()
 
+  local btnKeywordInvite = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnKeywordInvite:SetWidth(130); btnKeywordInvite:SetHeight(24)
+  btnKeywordInvite:SetPoint("RIGHT", submit, "LEFT", -6, 0)
+  btnKeywordInvite:SetText("Keyword invite")
+  StyleAccentButton(btnKeywordInvite)
+  SetAccentButtonEnabled(btnKeywordInvite, false)
+
+  local btnSortRaid = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnSortRaid:SetWidth(130); btnSortRaid:SetHeight(24)
+  btnSortRaid:SetPoint("LEFT", submit, "RIGHT", 6, 0)
+  btnSortRaid:SetText("Sort raid")
+  StyleAccentButton(btnSortRaid)
+  SetAccentButtonEnabled(btnSortRaid, false)
+
   local btnSetup = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnSetup:SetWidth(130); btnSetup:SetHeight(24)
   btnSetup:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 16)
@@ -385,6 +450,13 @@ function TC:CreateImportFrame()
     f:Hide()
     TC:OpenSetupStep()
   end)
+  btnKeywordInvite:SetScript("OnClick", function()
+    if not HasValidCompositionText(edit:GetText()) then return end
+    OpenKeywordInvite()
+  end)
+  btnSortRaid:SetScript("OnClick", function()
+    -- intentionally unbound for now
+  end)
   edit:SetScript("OnTextChanged", function()
     local lines = countLines(edit:GetText())
     local minH = 320
@@ -392,9 +464,13 @@ function TC:CreateImportFrame()
     if targetH < minH then targetH = minH end
     edit:SetHeight(targetH)
     if ScrollingEdit_OnTextChanged then ScrollingEdit_OnTextChanged() end
-    local hasInput = trim(edit:GetText()) ~= ""
+    local current = edit:GetText()
+    local hasInput = trim(current) ~= ""
+    local hasValidInput = HasValidCompositionText(current)
     SetButtonEnabled(submit, hasInput)
     SetButtonEnabled(btnSetup, hasInput)
+    SetAccentButtonEnabled(btnKeywordInvite, hasValidInput)
+    SetAccentButtonEnabled(btnSortRaid, hasValidInput)
   end)
   submit:SetScript("OnClick", function()
     if not ParseAndStoreCurrent(edit:GetText()) then return end
@@ -407,6 +483,8 @@ function TC:CreateImportFrame()
   f.btnImport = btnImport
   f.btnSetup = btnSetup
   f.submit = submit
+  f.btnKeywordInvite = btnKeywordInvite
+  f.btnSortRaid = btnSortRaid
   self.importFrame = f
 end
 
@@ -656,6 +734,24 @@ function TC:CreateCompositionFrame()
   btnMatching:SetText("2/3. Matching")
   btnMatching:Disable()
 
+  local btnKeywordInvite = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnKeywordInvite:SetWidth(130); btnKeywordInvite:SetHeight(24)
+  btnKeywordInvite:SetPoint("RIGHT", btnMatching, "LEFT", -6, 0)
+  btnKeywordInvite:SetText("Keyword invite")
+  StyleAccentButton(btnKeywordInvite)
+  SetAccentButtonEnabled(btnKeywordInvite, HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""))
+  btnKeywordInvite:SetScript("OnClick", function() OpenKeywordInvite() end)
+
+  local btnSortRaid = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnSortRaid:SetWidth(130); btnSortRaid:SetHeight(24)
+  btnSortRaid:SetPoint("LEFT", btnMatching, "RIGHT", 6, 0)
+  btnSortRaid:SetText("Sort raid")
+  StyleAccentButton(btnSortRaid)
+  SetAccentButtonEnabled(btnSortRaid, HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""))
+  btnSortRaid:SetScript("OnClick", function()
+    -- intentionally unbound for now
+  end)
+
   local btnSetup = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnSetup:SetWidth(130); btnSetup:SetHeight(24)
   btnSetup:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 16)
@@ -669,6 +765,8 @@ function TC:CreateCompositionFrame()
   f.btnImport = btnImport
   f.btnMatching = btnMatching
   f.btnSetup = btnSetup
+  f.btnKeywordInvite = btnKeywordInvite
+  f.btnSortRaid = btnSortRaid
   self.viewFrame = f
 end
 
@@ -915,14 +1013,14 @@ function TC:CreateSetupFrame()
   f.groupSlots = {}
   local groupW, groupH = 370, 123
   local colGap, rowGap = 14, 5
-  local rowOffset = { 10, 15, 30, 45 }
+  local topOffset = 2
   local g
   for g=1,8 do
     local col = math.mod((g-1), 2)
     local row = math.floor((g-1) / 2)
     local gf = CreateFrame("Frame", nil, content)
     gf:SetWidth(groupW); gf:SetHeight(groupH)
-    local yoff = (row * (groupH + rowGap)) + (rowOffset[row+1] or 10)
+    local yoff = topOffset + (row * (groupH + rowGap))
     gf:SetPoint("TOPLEFT", content, "TOPLEFT", col * (groupW + colGap), -yoff)
     gf:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
     gf:SetBackdropColor(0,0,0,0.45)
@@ -971,11 +1069,32 @@ function TC:CreateSetupFrame()
     TC:ShowCompositionFrame()
   end)
 
+  local btnKeywordInvite = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnKeywordInvite:SetWidth(130); btnKeywordInvite:SetHeight(24)
+  btnKeywordInvite:SetPoint("RIGHT", btnMatching, "LEFT", -6, 0)
+  btnKeywordInvite:SetText("Keyword invite")
+  StyleAccentButton(btnKeywordInvite)
+  SetAccentButtonEnabled(btnKeywordInvite, HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""))
+  btnKeywordInvite:SetScript("OnClick", function() OpenKeywordInvite() end)
+
+  local btnSortRaid = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnSortRaid:SetWidth(130); btnSortRaid:SetHeight(24)
+  btnSortRaid:SetPoint("LEFT", btnMatching, "RIGHT", 6, 0)
+  btnSortRaid:SetText("Sort raid")
+  StyleAccentButton(btnSortRaid)
+  SetAccentButtonEnabled(btnSortRaid, HasValidCompositionText(TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""))
+  btnSortRaid:SetScript("OnClick", function()
+    -- intentionally unbound for now
+  end)
+
   local btnSetup = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnSetup:SetWidth(130); btnSetup:SetHeight(24)
   btnSetup:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 16)
   btnSetup:SetText("3/3. Setup ->")
   btnSetup:Disable()
+
+  f.btnKeywordInvite = btnKeywordInvite
+  f.btnSortRaid = btnSortRaid
 
   self.setupFrame = f
 end
