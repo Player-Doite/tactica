@@ -448,30 +448,89 @@ rbHasRoom = function(role)
 
   local exclude = (R and R._exclude) or {}
 
-  local present = {}
-  local total = (GetNumRaidMembers and GetNumRaidMembers()) or 0
-  for i=1,total do
-    local nm = GetRaidRosterInfo(i)
-    if nm and nm ~= "" and not exclude[nm] then present[nm] = true end
+  -- Build a present-name map that works for BOTH raid and party.
+  local function GetPresentNameMap()
+    local present = {}
+
+    -- Always include player (party roster does not include it via party1..4).
+    if UnitName then
+      local me = UnitName("player")
+      if me and me ~= "" then
+        present[me] = true
+      end
+    end
+
+    local nRaid = GetNumRaidMembers and GetNumRaidMembers() or 0
+    if nRaid and nRaid > 0 then
+      local i
+      for i = 1, nRaid do
+        local name = GetRaidRosterInfo(i)
+        if name and name ~= "" then
+          present[name] = true
+        end
+      end
+      return present
+    end
+
+    -- Party (0..4 members besides player)
+    local nParty = GetNumPartyMembers and GetNumPartyMembers() or 0
+    local i
+    for i = 1, nParty do
+      local unit = "party" .. i
+      local name = UnitName and UnitName(unit) or nil
+      if name and name ~= "" then
+        present[name] = true
+      end
+    end
+
+    return present
   end
 
-  local T = (TacticaDB and TacticaDB.Tanks)   or {}
-  local H = (TacticaDB and TacticaDB.Healers) or {}
-  local D = (TacticaDB and TacticaDB.DPS)     or {}
+  -- Count:
+  --  * presentCount = actual group size (exclude-aware) -> used for size cap
+  --  * cT/cH/cD = role counts (exclude-aware) -> used for role capacity
+  local function GetCounts()
+    ensureRoleBuckets()
+    local present = GetPresentNameMap()
+    local cT, cH, cD = 0, 0, 0
+    local presentCount = 0
 
-  local ct,ch,cd = 0,0,0
-  for nm,_ in pairs(present) do
-    if     T[nm] then ct=ct+1
-    elseif H[nm] then ch=ch+1
-    elseif D[nm] then cd=cd+1 end
+    local name
+    for name in pairs(present) do
+      if not exclude[name] then
+        presentCount = presentCount + 1
+        if TacticaDB.Tanks[name] then
+          cT = cT + 1
+        elseif TacticaDB.Healers[name] then
+          cH = cH + 1
+        elseif TacticaDB.DPS[name] then
+          cD = cD + 1
+        end
+      end
+    end
+
+    return cT, cH, cD, presentCount
   end
 
-  local dBudget = size - wantT - wantH
-  if dBudget < 0 then dBudget = 0 end
-  if     role == "TANK"  then return (wantT - ct) > 0
-  elseif role == "HEALER"then return (wantH - ch) > 0
-  elseif role == "DPS"   then return (dBudget - cd) > 0
-  else return true end
+  local currentT, currentH, currentD, presentCount = GetCounts()
+
+  -- Hard cap by actual occupied slots, not only "assigned roles"
+  if presentCount >= size then
+    return false
+  end
+
+  local wantD = size - wantT - wantH
+  if wantD < 0 then wantD = 0 end
+
+  local needT = wantT - currentT
+  local needH = wantH - currentH
+  local needD = wantD - currentD
+
+  if role == "TANK" then return needT > 0 end
+  if role == "HEALER" then return needH > 0 end
+  if role == "DPS" then return needD > 0 end
+
+  return (needT > 0) or (needH > 0) or (needD > 0)
 end
 
 -- Role targets from Raid Builder (totals aimed for)
@@ -1248,7 +1307,7 @@ local function onWhisperReply(author, msg)
 
   if ctx == "active" then
     local _, classHint2 = detectRoleAndClass(tokens)
-    local allowed = AllowedRolesForClass(classHint2)
+    local allowed = (INV.lastPrompt[author] and INV.lastPrompt[author].allowed) or AllowedRolesForClass(classHint2)
     local hinted  = ParseRoleHints(msg)
     local letters = (hinted and table.getn(hinted)>0) and IntersectOffered(hinted, allowed) or nil
     local filtered = FilterByCapacity(letters)
@@ -1288,7 +1347,7 @@ local function onWhisperReply(author, msg)
   clearAwait()
 
   if ctx == "rb-confirm" then
-    local allowed = AllowedRolesForClass(classHint)
+    local allowed = (INV.lastPrompt[author] and INV.lastPrompt[author].allowed) or AllowedRolesForClass(classHint)
     local hinted  = ParseRoleHints(msg)
     local letters = (hinted and table.getn(hinted)>0) and IntersectOffered(hinted, allowed) or nil
     local filtered = FilterByCapacity(letters)
