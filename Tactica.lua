@@ -1190,6 +1190,7 @@ function Tactica:ShowOptionsFrame()
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   title:SetPoint("TOP", f, "TOP", 0, -12)
   title:SetText("Tactica Options")
+  title:SetTextColor(0.2, 1.0, 0.6)
 
   -- helper to build one checkbox + label, and return the checkbox
   local function mkcb(name, y, text)
@@ -1376,6 +1377,7 @@ function Tactica:CreateAddFrame()
     title:SetPoint("TOP", f, "TOP", 0, -15)
     title:SetText("Add New Tactic")
 	title:SetFontObject(GameFontNormalLarge)
+    title:SetTextColor(0.2, 1.0, 0.6)
 
     -- RAID DROPDOWN
     local raidLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1601,6 +1603,7 @@ function Tactica:CreatePostFrame()
     title:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -15)
     title:SetText("Post Tactic")
 	title:SetFontObject(GameFontNormalLarge)
+    title:SetTextColor(0.2, 1.0, 0.6)
 
     -- Close button (X)
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -1886,6 +1889,7 @@ function Tactica:CreateRemoveFrame()
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", f, "TOP", 0, -15)
     title:SetText("Remove Custom Tactic")
+    title:SetTextColor(0.2, 1.0, 0.6)
 
     -- Close button (X)
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -2269,7 +2273,7 @@ do
   local function _MenuInit()
     local info
 
-    info = { isTitle = 1, text = "Tactica", notCheckable = 1, justifyH = "CENTER" }
+    info = { isTitle = 1, text = "|cff33ff99Tactica|r", notCheckable = 1, justifyH = "CENTER" }
     UIDropDownMenu_AddButton(info, 1)
 
     local add = function(text, fn, disabled)

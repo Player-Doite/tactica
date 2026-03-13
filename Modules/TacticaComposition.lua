@@ -100,6 +100,28 @@ local function getAssignedRoleLetter(name)
   return "?"
 end
 
+local function clearRoleForName(name)
+  if not TacticaDB or not name or name == "" then return end
+  TacticaDB.Tanks = TacticaDB.Tanks or {}
+  TacticaDB.Healers = TacticaDB.Healers or {}
+  TacticaDB.DPS = TacticaDB.DPS or {}
+  TacticaDB.Tanks[name] = nil
+  TacticaDB.Healers[name] = nil
+  TacticaDB.DPS[name] = nil
+end
+
+local function setRoleForName(name, roleLetter)
+  if not name or name == "" then return end
+  clearRoleForName(name)
+  if roleLetter == "T" then
+    TacticaDB.Tanks[name] = true
+  elseif roleLetter == "H" then
+    TacticaDB.Healers[name] = true
+  elseif roleLetter == "D" then
+    TacticaDB.DPS[name] = true
+  end
+end
+
 local function getClassColorForName(name)
   local ln = lower(name)
   local function unitColor(unit)
@@ -373,6 +395,55 @@ function TC:BuildDesiredGroups()
   return desired
 end
 
+function TC:BuildDesiredRoleMap()
+  EnsureDB()
+  local data = TacticaDB and TacticaDB.Composition and TacticaDB.Composition.current
+  local roleMap = {}
+  if not data then return roleMap end
+
+  self.setupOverrides = GetSetupOverrides()
+  local members = getRaidMemberNamesLower()
+  local defaults = {}
+
+  local i
+  for i=1,table.getn(data.slots) do
+    local slot = data.slots[i]
+    local g = tonumber(slot.groupNumber) or 0
+    local sidx = tonumber(slot.slotNumber) or 0
+    if g >= 1 and g <= 8 and sidx >= 1 and sidx <= 5 then
+      local key = g..":"..sidx
+      local autoName = FindAutoMatch(slot.name)
+      local name = (autoName and members[lower(autoName)]) and autoName or slot.name
+      local role = (slot.role == "Tank" and "T") or (slot.role == "Healer" and "H") or "D"
+      defaults[key] = { name = name, role = role }
+    end
+  end
+
+  local g, sidx
+  for g=1,8 do
+    for sidx=1,5 do
+      local key = g..":"..sidx
+      local ov = self.setupOverrides[key]
+      local effective = defaults[key]
+
+      if ov and ov.kind == "slot" and defaults[ov.sourceKey] then
+        effective = defaults[ov.sourceKey]
+      elseif ov and ov.kind == "empty" then
+        effective = nil
+      elseif ov and ov.kind == "raid" then
+        effective = nil
+      end
+
+      if effective and effective.name and members[lower(effective.name)] then
+        local raidName = members[lower(effective.name)]
+        roleMap[raidName] = effective.role
+      end
+    end
+  end
+
+  return roleMap
+end
+
 function TC:SortRaidToSetupGroups()
   if not (UnitInRaid and UnitInRaid("player")) then
     cfmsg("You must be in a raid to sort groups.")
@@ -507,8 +578,22 @@ function TC:SortRaidToSetupGroups()
   moveUnplannedOutOfPlannedGroups()
   spillOverfilledGroups()
 
+  local roleMap = self:BuildDesiredRoleMap()
+  local changedRoles = 0
+  local nm, roleLetter
+  for nm, roleLetter in pairs(roleMap) do
+    if getAssignedRoleLetter(nm) ~= roleLetter then
+      setRoleForName(nm, roleLetter)
+      changedRoles = changedRoles + 1
+    end
+  end
+
+  if changedRoles > 0 and TacticaRaidBuilder and TacticaRaidBuilder.NotifyRoleAssignmentChanged then
+    TacticaRaidBuilder.NotifyRoleAssignmentChanged()
+  end
+
   if self.setupFrame and self.setupFrame:IsShown() then self:RefreshSetupFrame() end
-  cfmsg("Sort groups complete. Moves issued: "..tostring(moved)..".")
+  cfmsg("Sort groups complete. Moves: "..tostring(moved)..", roles updated: "..tostring(changedRoles)..".")
 end
 
 local function BuildAliasList(discordName)
@@ -1420,7 +1505,7 @@ function TC:CreateSetupFrame()
       label:SetText("-")
 
       local dd = CreateFrame("Frame", "TacticaCompositionSetupDropDownG"..g.."S"..sidx, rowf, "UIDropDownMenuTemplate")
-      dd:SetPoint("LEFT", label, "RIGHT", -32, -2)
+      dd:SetPoint("LEFT", label, "RIGHT", -37, -2)
       UIDropDownMenu_SetWidth(96, dd)
 
       f.groupSlots[g][sidx] = { frame=rowf, label=label, dd=dd }
