@@ -179,8 +179,14 @@ Tactica = {
     selectedRaid = nil,
     selectedBoss = nil,
 	AutoPostHintShown = false,
-    RecentlyPosted = {}
+	    RecentlyPosted = {}
 };
+
+local TACTICA_TITLE_COLOR = "|cff33ff99"
+local function SetGreenTitle(fs, text)
+  if not fs then return end
+  fs:SetText(TACTICA_TITLE_COLOR .. tostring(text or "") .. "|r")
+end
 
 Tactica.Aliases = {
     -- Raids
@@ -1189,8 +1195,7 @@ function Tactica:ShowOptionsFrame()
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   title:SetPoint("TOP", f, "TOP", 0, -12)
-  title:SetText("Tactica Options")
-  title:SetTextColor(0.2, 1.0, 0.6)
+  SetGreenTitle(title, "Tactica Options")
 
   -- helper to build one checkbox + label, and return the checkbox
   local function mkcb(name, y, text)
@@ -1375,9 +1380,8 @@ function Tactica:CreateAddFrame()
     -- Title
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", f, "TOP", 0, -15)
-    title:SetText("Add New Tactic")
+    SetGreenTitle(title, "Add New Tactic")
 	title:SetFontObject(GameFontNormalLarge)
-    title:SetTextColor(0.2, 1.0, 0.6)
 
     -- RAID DROPDOWN
     local raidLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1601,9 +1605,8 @@ function Tactica:CreatePostFrame()
     -- Title
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -15)
-    title:SetText("Post Tactic")
+    SetGreenTitle(title, "Post Tactic")
 	title:SetFontObject(GameFontNormalLarge)
-    title:SetTextColor(0.2, 1.0, 0.6)
 
     -- Close button (X)
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -1888,8 +1891,7 @@ function Tactica:CreateRemoveFrame()
     -- Title
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", f, "TOP", 0, -15)
-    title:SetText("Remove Custom Tactic")
-    title:SetTextColor(0.2, 1.0, 0.6)
+    SetGreenTitle(title, "Remove Custom Tactic")
 
     -- Close button (X)
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -2273,7 +2275,7 @@ do
   local function _MenuInit()
     local info
 
-    info = { isTitle = 1, text = "|cff33ff99Tactica|r", notCheckable = 1, justifyH = "CENTER" }
+    info = { isTitle = 1, text = TACTICA_TITLE_COLOR .. "Tactica|r", notCheckable = 1, justifyH = "CENTER" }
     UIDropDownMenu_AddButton(info, 1)
 
     local add = function(text, fn, disabled)

@@ -1511,9 +1511,8 @@ function RB.Open()
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   title:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -14)
-  title:SetText("Tactica Raid Builder")
+  title:SetText("|cff33ff99Tactica Raid Builder|r")
   title:SetFontObject(GameFontNormalLarge)
-  title:SetTextColor(0.2, 1.0, 0.6)
 
   RB.btnClose = CreateFrame("Button", nil, f, "UIPanelCloseButton")
   RB.btnClose:SetPoint("TOPRIGHT", f, "TOPRIGHT", -5, -5)

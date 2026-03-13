@@ -1489,8 +1489,7 @@ function INV.Open()
 
   local title = f:CreateFontString(nil,"OVERLAY","GameFontNormalLarge")
   title:SetPoint("TOP", f, "TOP", 0, -16)
-  title:SetText("Auto Invite")
-  title:SetTextColor(0.2, 1.0, 0.6)
+  title:SetText("|cff33ff99Auto Invite|r")
 
   local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   lbl:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -45)
@@ -1508,6 +1507,7 @@ function INV.Open()
 
   local cb = CreateFrame("CheckButton", "TacticaInviteAutoAssign", f, "UICheckButtonTemplate")
   INV.ui.cb = cb
+  INV.autoAssign = false
   cb:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -5)
   cb:SetWidth(20); cb:SetHeight(20)
   getglobal("TacticaInviteAutoAssignText"):SetText("Auto-assign roles")
