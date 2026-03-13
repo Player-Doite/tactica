@@ -45,11 +45,19 @@ _Access all functionalities and commands via **Minimap Icon**_ (<img width="15" 
 - “Don’t ask again this raid” (raid-scoped) and global on/off setting.
 <img width="287" height="161" alt="Tactica-loot" src="https://github.com/user-attachments/assets/f8fcd04a-8060-4fa1-bb13-7d76810d9800" />
 
-### 6. Export raid roster
-- Copy paste excel and google sheet friendly outputs of participating raid members.
-- Select output type (only name, name & role, name & class, or everything).
-- `/tt export` for export UI.
+### 5. Composition Tool (Raid-Helper import → live raid setup)
+- Import your Raid-Helper Composition Tool JSON and map Discord names to in-game characters in a 3-step flow.
+- Step 1 – Import: paste JSON export directly (invalid format is rejected with a clear message).
+- Step 2 – Matching: Tactica suggests matches when joined names partially/fully match Discord names; press Add to confirm aliases (you can store multiple aliases per person).
+- Step 3 – Setup: allocate unmatched players into the planned group grid, then press Sort groups to apply to the live roster.
+- Includes quick Keyword invite access from the same flow.
+- `/tt comp` or `/tt composition` (or minimap shortcut) opens the tool.
 
+### 6. Export raid roster
+- Export your current raid roster into spreadsheet-friendly text (Excel / Google Sheets).
+- Choose output format depending on what you need (names only, roles, class, or full details).
+- Great for attendance tracking, split planning, and post-raid logs.
+- `/tt export` to open the export UI.
 
 ## Quick start
 - Use the **minimap icon** — full access and command list
