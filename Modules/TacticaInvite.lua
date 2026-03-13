@@ -526,6 +526,20 @@ rbHasRoom = function(role)
   local needH = wantH - currentH
   local needD = wantD - currentD
 
+  if needT < 0 then needT = 0 end
+  if needH < 0 then needH = 0 end
+  if needD < 0 then needD = 0 end
+
+  -- Keep role capacity aligned with RB's own "Need:" logic.
+  -- When role deficits exceed remaining physical slots, reserve slots in T/H/D order.
+  local slotsLeft = size - presentCount
+  if slotsLeft < 0 then slotsLeft = 0 end
+  if needT > slotsLeft then needT = slotsLeft end
+  slotsLeft = slotsLeft - needT
+  if needH > slotsLeft then needH = slotsLeft end
+  slotsLeft = slotsLeft - needH
+  if needD > slotsLeft then needD = slotsLeft end
+
   if role == "TANK" then return needT > 0 end
   if role == "HEALER" then return needH > 0 end
   if role == "DPS" then return needD > 0 end
