@@ -179,8 +179,14 @@ Tactica = {
     selectedRaid = nil,
     selectedBoss = nil,
 	AutoPostHintShown = false,
-    RecentlyPosted = {}
+	    RecentlyPosted = {}
 };
+
+local TACTICA_TITLE_COLOR = "|cff33ff99"
+local function SetGreenTitle(fs, text)
+  if not fs then return end
+  fs:SetText(TACTICA_TITLE_COLOR .. tostring(text or "") .. "|r")
+end
 
 Tactica.Aliases = {
     -- Raids
@@ -724,6 +730,14 @@ function Tactica:CommandHandler(msg)
 	  end
 	  return
 
+	elseif command == "comp" or command == "composition" then
+	  if TacticaComposition and TacticaComposition.Open then
+		TacticaComposition:Open()
+	  else
+		self:PrintError("Composition module not loaded.")
+	  end
+	  return
+
 	elseif command == "lfm" then
 	  if TacticaRaidBuilder and TacticaRaidBuilder.AnnounceOnce then TacticaRaidBuilder.AnnounceOnce() end
 
@@ -1060,6 +1074,7 @@ function Tactica:PrintHelp()
 	self:PrintMessage("  |cffffff00/tt roles|r (post Tanks/Healers/DPS to raid)")
 	self:PrintMessage("  |cffffff00/tt export|r (export roster as copyable CSV)")
 	self:PrintMessage("  |cffffff00/tt options|r (small options panel for toggles)")
+	self:PrintMessage("  |cffffff78/tt comp|r or |cffffff78/tt composition|r (open composition tool)")
 	self:PrintMessage("  |cffffff00/w Doite|r (addon and tactics by Doite)");
 end
 
@@ -1439,7 +1454,7 @@ function Tactica:ShowOptionsFrame()
 
   local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   title:SetPoint("TOP", f, "TOP", 0, -12)
-  title:SetText("Tactica Options")
+  SetGreenTitle(title, "Tactica Options")
 
   -- helper to build one checkbox + label, and return the checkbox
   local function mkcb(name, y, text)
@@ -1624,7 +1639,7 @@ function Tactica:CreateAddFrame()
     -- Title
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", f, "TOP", 0, -15)
-    title:SetText("Add New Tactic")
+    SetGreenTitle(title, "Add New Tactic")
 	title:SetFontObject(GameFontNormalLarge)
 
     -- RAID DROPDOWN
@@ -1849,7 +1864,7 @@ function Tactica:CreatePostFrame()
     -- Title
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -15)
-    title:SetText("Post Tactic")
+    SetGreenTitle(title, "Post Tactic")
 	title:SetFontObject(GameFontNormalLarge)
 
     -- Close button (X)
@@ -2135,7 +2150,7 @@ function Tactica:CreateRemoveFrame()
     -- Title
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOP", f, "TOP", 0, -15)
-    title:SetText("Remove Custom Tactic")
+    SetGreenTitle(title, "Remove Custom Tactic")
 
     -- Close button (X)
     local closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
@@ -2509,6 +2524,7 @@ do
       "|cffffff00/tt roles|r – post tank/healer summary",
       "|cffffff00/tt rolewhisper|r – toggle role whisper",
       "|cffffff00/tt options|r – options panel",
+      "|cffffff78/tt comp|r – open composition tool",
     }
   end
 
@@ -2519,7 +2535,7 @@ do
   local function _MenuInit()
     local info
 
-    info = { isTitle = 1, text = "Tactica", notCheckable = 1, justifyH = "CENTER" }
+    info = { isTitle = 1, text = TACTICA_TITLE_COLOR .. "Tactica|r", notCheckable = 1, justifyH = "CENTER" }
     UIDropDownMenu_AddButton(info, 1)
 
     local add = function(text, fn, disabled)
@@ -2542,6 +2558,13 @@ do
         TacticaInvite.Open()
       else
         if Tactica and Tactica.PrintError then Tactica:PrintError("Auto-Invite module not loaded.") end
+      end
+    end)
+	add("Open Composition Tool", function()
+      if TacticaComposition and TacticaComposition.Open then
+        TacticaComposition:Open()
+      else
+        if Tactica and Tactica.PrintError then Tactica:PrintError("Composition module not loaded.") end
       end
     end)
 	add("Open Export", function() if Tactica and Tactica.ShowExportRolesFrame then Tactica:ShowExportRolesFrame() end end)
