@@ -45,6 +45,12 @@ _Access all functionalities and commands via **Minimap Icon**_ (<img width="15" 
 - “Don’t ask again this raid” (raid-scoped) and global on/off setting.
 <img width="287" height="161" alt="Tactica-loot" src="https://github.com/user-attachments/assets/f8fcd04a-8060-4fa1-bb13-7d76810d9800" />
 
+### 6. Export raid roster
+- Copy paste excel and google sheet friendly outputs of participating raid members.
+- Select output type (only name, name & role, name & class, or everything).
+- `/tt export` for export UI.
+
+
 ## Quick start
 - Use the **minimap icon** — full access and command list
 - `/tt` or `/tactica` or `/tt help` — full command list
