@@ -7,7 +7,7 @@ TacticaInvite = INV
 -- session state
 INV.enabled       = false
 INV.keyword       = ""
-INV.autoAssign    = true
+INV.autoAssign    = false
 
 -- RB bridge state
 INV.rbEnabled     = false
@@ -525,6 +525,20 @@ rbHasRoom = function(role)
   local needT = wantT - currentT
   local needH = wantH - currentH
   local needD = wantD - currentD
+
+  if needT < 0 then needT = 0 end
+  if needH < 0 then needH = 0 end
+  if needD < 0 then needD = 0 end
+
+  -- Keep role capacity aligned with RB's own "Need:" logic.
+  -- When role deficits exceed remaining physical slots, reserve slots in T/H/D order.
+  local slotsLeft = size - presentCount
+  if slotsLeft < 0 then slotsLeft = 0 end
+  if needT > slotsLeft then needT = slotsLeft end
+  slotsLeft = slotsLeft - needT
+  if needH > slotsLeft then needH = slotsLeft end
+  slotsLeft = slotsLeft - needH
+  if needD > slotsLeft then needD = slotsLeft end
 
   if role == "TANK" then return needT > 0 end
   if role == "HEALER" then return needH > 0 end
@@ -1548,7 +1562,7 @@ function INV.Open()
 
   local title = f:CreateFontString(nil,"OVERLAY","GameFontNormalLarge")
   title:SetPoint("TOP", f, "TOP", 0, -16)
-  title:SetText("Auto Invite")
+  title:SetText("|cff33ff99Auto Invite|r")
 
   local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   lbl:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -45)
@@ -1566,10 +1580,11 @@ function INV.Open()
 
   local cb = CreateFrame("CheckButton", "TacticaInviteAutoAssign", f, "UICheckButtonTemplate")
   INV.ui.cb = cb
+  INV.autoAssign = false
   cb:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -5)
   cb:SetWidth(20); cb:SetHeight(20)
   getglobal("TacticaInviteAutoAssignText"):SetText("Auto-assign roles")
-  cb:SetChecked(true)
+  cb:SetChecked(INV.autoAssign and true or false)
   cb:SetScript("OnClick", function()
     INV.autoAssign = this:GetChecked() and true or false
     cfmsg("Auto-Assign roles "..(INV.autoAssign and "|cff00ff00ENABLED|r" or "|cffff5555DISABLED|r").." (Standalone).")
