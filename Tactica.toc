@@ -1,6 +1,6 @@
 ## Interface: 11200
 ## Title: |cff33ff99[Tactica]|r
-## Version: 2.3.4
+## Version: 2.3.5
 ## Notes: Auto-build raids (invite/gearcheck), post tactics, set loot rules & assign roles - synced!
 ## Author: Doite
 ## SavedVariables: TacticaDB
