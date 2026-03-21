@@ -228,7 +228,7 @@ local ROLE_KEY = {
   heal="HEALER", healer="HEALER", heals="HEALER", resto="HEALER", holy="HEALER", disc="HEALER", discipline="HEALER", spriest="DPS", fwar="DPS",
   dps="DPS", dd="DPS", damage="DPS", fury="DPS", arms="DPS", enh="DPS", enhancement="DPS", elemental="DPS", ele="DPS", hunter="DPS", mage="DPS", rogue="DPS", warlock="DPS",
   balance="DPS", boomkin="DPS", moonkin="DPS", shadow="DPS", sp="DPS", cat="DPS", feral="DPS", mm="DPS", marks="DPS", marksmanship="DPS", survival="DPS", bm="DPS", sv="DPS", surv="DPS",
-  combat="DPS", assassin="DPS", assassination="DPS", subtlety="DPS", sub="DPS", daggers="DPS", swords="DPS", rdps="DPS", mdps="DPS", boomi="DPS", boomie="DPS", rdrood="HEALER",
+  combat="DPS", assassin="DPS", assassination="DPS", subtlety="DPS", sub="DPS", daggers="DPS", swords="DPS", rdps="DPS", mdps="DPS", boomi="DPS", boomie="DPS", rdrood="HEALER", hpriest="HEALER",
   ["+tank"]="TANK", ["+heal"]="HEALER", ["+heals"] = "HEALER", ["+dps"] = "DPS", rsham="HEALER", enh="DPS", hpala="HEALER", restosham="HEALER", restoshaman="HEALER", ["tank+"]="TANK", ["heal+"]="HEALER", ["heals+"] = "HEALER", ["dps+"] = "DPS"
 }
 
