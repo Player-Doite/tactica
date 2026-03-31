@@ -582,7 +582,10 @@ local function GetAssignedCounts()
   return ct, ch, cd
 end
 
--- choose lowest fill %, T/H equal priority; if both T & H are full and D is offered -> pick D
+-- Pick role in priority order:
+-- 1) Missing tank/healer slots first (tank wins ties over healer)
+-- 2) If T/H are full, fall back to DPS when offered
+-- 3) If nothing is missing, keep deterministic order T > H > D
 local function PickBestRole(offeredLetters)
   if not offeredLetters or table.getn(offeredLetters)==0 then return "D" end
 
@@ -590,11 +593,6 @@ local function PickBestRole(offeredLetters)
   local haveT, haveH, haveD = GetAssignedCounts()
 
   local missing = { T = math.max(needT - haveT, 0), H = math.max(needH - haveH, 0), D = math.max(needD - haveD, 0) }
-  local ratio   = {
-    T = (needT>0 and (haveT/needT) or 1e9),
-    H = (needH>0 and (haveH/needH) or 1e9),
-    D = (needD>0 and (haveD/needD) or 1e9),
-  }
 
   local hasT, hasH, hasD = false, false, false
   for i=1,table.getn(offeredLetters) do
@@ -603,22 +601,17 @@ local function PickBestRole(offeredLetters)
     hasD = hasD or offeredLetters[i]=="D"
   end
 
-  if hasT and hasH and missing.T == 0 and missing.H == 0 and hasD then
+  if hasT and missing.T > 0 then return "T" end
+  if hasH and missing.H > 0 then return "H" end
+
+  if hasD and missing.T == 0 and missing.H == 0 then
     return "D"
   end
 
-  local best, bestRatio, bestMissing
-  for j=1,table.getn(offeredLetters) do
-    local r = offeredLetters[j]
-    if (r == "T" or r == "H") or (not hasT and not hasH) then
-      local rr = ratio[r]
-      if (best==nil) or (rr < bestRatio) or (rr == bestRatio and missing[r] > bestMissing) then
-        best, bestRatio, bestMissing = r, rr, missing[r]
-      end
-    end
-  end
-
-  return best or offeredLetters[1]
+  if hasT then return "T" end
+  if hasH then return "H" end
+  if hasD then return "D" end
+  return offeredLetters[1]
 end
 
 -- invite helpers

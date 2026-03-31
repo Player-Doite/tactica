@@ -272,6 +272,7 @@ local TL_SawLootWindow = false
 local TL_AwaitingLoot  = false
 local TL_SlotsRemaining = nil
 local TL_WasInRaid = false
+local TL_AlreadyOnMsgShown = false
 
 -- Core entry when boss is targeted (from Tactica.lua)
 function TacticaLoot_OnBossTargeted()
@@ -281,13 +282,20 @@ function TacticaLoot_OnBossTargeted()
   if not IsBossTarget() then return end
 
   local method = GetLootMethod and GetLootMethod()
+  if method ~= "master" then
+    TL_AlreadyOnMsgShown = false
+  end
   if method == "master" then
-    local cf = DEFAULT_CHAT_FRAME or ChatFrame1
-    cf:AddMessage("|cff33ff99Tactica:|r Masterloot is already on. Change settings with /tt.")
+    if not TL_AlreadyOnMsgShown then
+      local cf = DEFAULT_CHAT_FRAME or ChatFrame1
+      cf:AddMessage("|cff33ff99Tactica:|r Masterloot is already on. Change settings with /tt.")
+      TL_AlreadyOnMsgShown = true
+    end
     return
   end
   local me = UnitName("player")
   SetLootMethod("master", me)
+  TL_AlreadyOnMsgShown = false
   local cf = DEFAULT_CHAT_FRAME or ChatFrame1
   cf:AddMessage("|cff33ff99Tactica:|r Enabled Masterloot. Change settings with /tt.")
 end
