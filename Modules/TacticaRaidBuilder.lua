@@ -2290,6 +2290,16 @@ TacticaDB.disablePopupThisRaid = TacticaDB.disablePopupThisRaid or false
 local selfWasInRaid = false
 local popupShownThisRaid = false
 
+local function RB_RaidNamesInOrder()
+    local names = {}
+    local n = GetNumRaidMembers and GetNumRaidMembers() or 0
+    for i=1,n do
+      local nm = GetRaidRosterInfo(i)
+      if nm and nm ~= "" then table.insert(names, nm) end
+    end
+    return names
+end
+
 local function RB_ShowLeaderPopup()
     -- do not show if Raid Builder is already open
     if RB.frame and RB.frame:IsShown() then return end
@@ -2300,7 +2310,7 @@ local function RB_ShowLeaderPopup()
 
     local f = CreateFrame("Frame", "TacticaLeaderPopup", UIParent)
     RB._leaderPopup = f
-    f:SetWidth(350); f:SetHeight(220)
+    f:SetWidth(350); f:SetHeight(255)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     f:SetBackdrop({
         bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
@@ -2324,6 +2334,41 @@ local function RB_ShowLeaderPopup()
     text:SetWidth(360)
     text:SetJustifyH("LEFT")
     text:SetText("You are forming a raid.\nWould you like Tactica to assist?\n\nFeatures:\n• Auto role-assignment\n• Auto Gearchecks\n• Auto-invite (use /ttai)\n• Auto announcements\n• Auto LFM-message updates")
+
+    local mlLbl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    mlLbl:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -152)
+    if mlLbl.SetTextColor then mlLbl:SetTextColor(1.0, 0.82, 0) end
+    mlLbl:SetText("Preset Masterlooter:")
+
+    local mlDD = CreateFrame("Frame", "TacticaRBLeaderPopupML", f, "UIDropDownMenuTemplate")
+    mlDD:SetPoint("TOPLEFT", f, "TOPLEFT", 120, -141)
+    UIDropDownMenu_SetWidth(160, mlDD)
+    UIDropDownMenu_Initialize(mlDD, function()
+      UIDropDownMenu_AddButton({
+        text = "None/raidlead",
+        func = function()
+          if type(TacticaRaidRoles_SetPresetMasterLooter) == "function" then
+            TacticaRaidRoles_SetPresetMasterLooter("")
+          end
+          UIDropDownMenu_SetText("None/raidlead", mlDD)
+        end
+      })
+      local names = RB_RaidNamesInOrder()
+      for i=1, table.getn(names) do
+        local nm = names[i]
+        UIDropDownMenu_AddButton({
+          text = nm,
+          func = function()
+            if type(TacticaRaidRoles_SetPresetMasterLooter) == "function" then
+              TacticaRaidRoles_SetPresetMasterLooter(nm)
+            end
+            UIDropDownMenu_SetText(nm, mlDD)
+          end
+        })
+      end
+    end)
+    local currentML = (type(TacticaRaidRoles_GetPresetMasterLooter) == "function" and TacticaRaidRoles_GetPresetMasterLooter()) or ""
+    UIDropDownMenu_SetText((currentML ~= "" and currentML) or "None/raidlead", mlDD)
 
     -- checkbox
     local checkbox = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")

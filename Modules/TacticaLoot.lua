@@ -100,10 +100,36 @@ local function GetMasterLooterName()
   return nil
 end
 
+local function GetPresetMasterLooter()
+  if type(TacticaRaidRoles_GetPresetMasterLooter) == "function" then
+    local n = TacticaRaidRoles_GetPresetMasterLooter()
+    if n and n ~= "" then return n end
+  end
+  return nil
+end
+
+local function NormalizeName(n)
+  if not n then return nil end
+  local base = string.match(n, "^([^%-]+)")
+  return string.lower(base or n)
+end
+
 local function IsSelfMasterLooter()
   local my = UnitName("player")
   local ml = GetMasterLooterName()
-  return (my and ml and my == ml) or false
+  return (NormalizeName(my) and NormalizeName(ml) and NormalizeName(my) == NormalizeName(ml)) or false
+end
+
+local function CountRemainingLootSlots()
+  local n = GetNumLootItems and GetNumLootItems() or 0
+  if n <= 0 then return 0 end
+  local remaining = 0
+  for i=1, n do
+    if LootSlotHasItem and LootSlotHasItem(i) then
+      remaining = remaining + 1
+    end
+  end
+  return remaining
 end
 
 -------------------------------------------------
@@ -143,8 +169,9 @@ end
 -------------------------------------------------
 -- Popup UI
 -------------------------------------------------
-local LootFrame, LootDropdown, DontAskCB
+local LootFrame, LootDropdown, LootMLDropdown, DontAskCB
 local SelectedMethod = "group"
+local SelectedPresetML = ""
 local LOOT_METHODS = {
   { text = "Group Loot",        value = "group" },
   { text = "Round Robin",       value = "roundrobin" },
@@ -153,11 +180,45 @@ local LOOT_METHODS = {
   { text = "Master Looter",     value = "master" },
 }
 
+local function RaidMembersChronological()
+  local t = {}
+  if not InRaid() then return t end
+  for i=1, (GetNumRaidMembers() or 0) do
+    local n = GetRaidRosterInfo(i)
+    if n and n ~= "" then table.insert(t, n) end
+  end
+  return t
+end
+
+local function InitPresetMLDropdown(dd)
+  UIDropDownMenu_Initialize(dd, function()
+    local info = {
+      text = "None/raidlead",
+      func = function()
+        SelectedPresetML = ""
+        UIDropDownMenu_SetText("None/raidlead", dd)
+      end
+    }
+    UIDropDownMenu_AddButton(info)
+    local names = RaidMembersChronological()
+    for i=1, tlen(names) do
+      local nm = names[i]
+      UIDropDownMenu_AddButton({
+        text = nm,
+        func = function()
+          SelectedPresetML = nm
+          UIDropDownMenu_SetText(nm, dd)
+        end
+      })
+    end
+  end)
+end
+
 local function CreateLootPopup()
   if LootFrame then return end
 
   local f = CreateFrame("Frame", "TacticaLootPopup", UIParent)
-  f:SetWidth(235); f:SetHeight(135)
+  f:SetWidth(280); f:SetHeight(190)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   f:SetBackdrop({
     bgFile  = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -195,10 +256,21 @@ local function CreateLootPopup()
     end
   end)
 
+  local mlLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  mlLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -90)
+  if mlLabel.SetTextColor then mlLabel:SetTextColor(1.0, 0.82, 0) end
+  mlLabel:SetText("Preset Masterlooter:")
+
+  local mlDD = CreateFrame("Frame", "TacticaLootMLDropdown", f, "UIDropDownMenuTemplate")
+  mlDD:SetPoint("TOPLEFT", f, "TOPLEFT", 95, -79)
+  mlDD:SetWidth(160)
+  LootMLDropdown = mlDD
+  InitPresetMLDropdown(mlDD)
+
   -- “Don’t ask again this raid”
   local cb = CreateFrame("CheckButton", "TacticaLootDontAskCB", f, "UICheckButtonTemplate")
   cb:SetWidth(24); cb:SetHeight(24)
-  cb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 35, 40)
+  cb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 35, 52)
   local cbText = getglobal("TacticaLootDontAskCBText")
   if cbText then cbText:SetText("Don't ask again this raid") end
   DontAskCB = cb
@@ -215,10 +287,13 @@ local function CreateLootPopup()
       f:Hide()
       return
     end
+    if InRaid() and IsRL() and type(TacticaRaidRoles_SetPresetMasterLooter) == "function" then
+      TacticaRaidRoles_SetPresetMasterLooter(SelectedPresetML or "")
+    end
     local method = SelectedMethod or "group"
     if method == "master" then
-      local me = UnitName("player")
-      SetLootMethod("master", me)
+      local ml = GetPresetMasterLooter() or UnitName("player")
+      SetLootMethod("master", ml)
     else
       SetLootMethod(method)
     end
@@ -262,6 +337,11 @@ function TacticaLoot_ShowPopup()
     if LOOT_METHODS[i].value == def then shown = LOOT_METHODS[i].text end
   end
   if LootDropdown then UIDropDownMenu_SetText(shown, LootDropdown) end
+  if LootMLDropdown then
+    InitPresetMLDropdown(LootMLDropdown)
+    SelectedPresetML = (GetPresetMasterLooter() or "")
+    UIDropDownMenu_SetText((SelectedPresetML ~= "" and SelectedPresetML) or "None/raidlead", LootMLDropdown)
+  end
   LootFrame:Show()
 end
 
@@ -293,8 +373,8 @@ function TacticaLoot_OnBossTargeted()
     end
     return
   end
-  local me = UnitName("player")
-  SetLootMethod("master", me)
+  local ml = GetPresetMasterLooter() or UnitName("player")
+  SetLootMethod("master", ml)
   TL_AlreadyOnMsgShown = false
   local cf = DEFAULT_CHAT_FRAME or ChatFrame1
   cf:AddMessage("|cff33ff99Tactica:|r Enabled Masterloot. Change settings with /tt.")
@@ -344,8 +424,7 @@ f:SetScript("OnEvent", function()
   elseif event == "LOOT_OPENED" then
     if not TL_AwaitingLoot then return end
     TL_SawLootWindow = true
-    local n = GetNumLootItems and GetNumLootItems() or 0
-    TL_SlotsRemaining = n
+    TL_SlotsRemaining = CountRemainingLootSlots()
 
   elseif event == "LOOT_SLOT_CLEARED" then
     if TL_SlotsRemaining and TL_SlotsRemaining > 0 then
@@ -355,6 +434,7 @@ f:SetScript("OnEvent", function()
   elseif event == "LOOT_CLOSED" then
     if not TL_AwaitingLoot then return end
     TL_AwaitingLoot = false
+    TL_SlotsRemaining = CountRemainingLootSlots()
 
     -- If I'm the ML, notify raid when corpse empties so RL can react
     local method = GetLootMethod and GetLootMethod()
@@ -397,7 +477,7 @@ f:SetScript("OnEvent", function()
 
     -- Only trust the current ML as sender
     local ml = GetMasterLooterName()
-    if not (ml and sender and sender == ml) then return end
+    if not (ml and sender and NormalizeName(sender) == NormalizeName(ml)) then return end
 
     TacticaLoot_ShowPopup()
   end
