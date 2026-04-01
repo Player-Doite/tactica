@@ -224,12 +224,16 @@ end
 local PURE_DPS = { hunter=true, mage=true, rogue=true, warlock=true }
 
 local ROLE_KEY = {
-  tank="TANK", tanks="TANK", prot="TANK", protection="TANK", shield="TANK", bear="TANK", furyprot="TANK", ot="TANK", mt="TANK", 
-  heal="HEALER", healer="HEALER", heals="HEALER", resto="HEALER", holy="HEALER", disc="HEALER", discipline="HEALER", spriest="DPS", fwar="DPS",
-  dps="DPS", dd="DPS", damage="DPS", fury="DPS", arms="DPS", enh="DPS", enhancement="DPS", elemental="DPS", ele="DPS", hunter="DPS", mage="DPS", rogue="DPS", warlock="DPS",
+  tank="TANK", tanks="TANK", prot="TANK", protection="TANK", shield="TANK", bear="TANK", furyprot="TANK", ot="TANK", mt="TANK",
+  offtank="TANK", maintank="TANK", tanking="TANK", def="TANK",
+  heal="HEALER", healer="HEALER", heals="HEALER", resto="HEALER", holy="HEALER", disc="HEALER", discipline="HEALER", hpal="HEALER", hpr="HEALER", rdruid="HEALER", rdr="HEALER", healz="HEALER",
+  spriest="DPS", fwar="DPS",
+  dps="DPS", dd="DPS", damage="DPS", dmg="DPS", deeps="DPS", fury="DPS", arms="DPS", enh="DPS", enhancement="DPS", elemental="DPS", ele="DPS", hunter="DPS", mage="DPS", rogue="DPS", warlock="DPS",
   balance="DPS", boomkin="DPS", moonkin="DPS", shadow="DPS", sp="DPS", cat="DPS", feral="DPS", mm="DPS", marks="DPS", marksmanship="DPS", survival="DPS", bm="DPS", sv="DPS", surv="DPS",
-  combat="DPS", assassin="DPS", assassination="DPS", subtlety="DPS", sub="DPS", daggers="DPS", swords="DPS", rdps="DPS", mdps="DPS", boomi="DPS", boomie="DPS", rdrood="HEALER", hpriest="HEALER",
-  ["+tank"]="TANK", ["+heal"]="HEALER", ["+heals"] = "HEALER", ["+dps"] = "DPS", rsham="HEALER", enh="DPS", hpala="HEALER", restosham="HEALER", restoshaman="HEALER", ["tank+"]="TANK", ["heal+"]="HEALER", ["heals+"] = "HEALER", ["dps+"] = "DPS"
+  combat="DPS", assassin="DPS", assassination="DPS", assa="DPS", subtlety="DPS", sub="DPS", daggers="DPS", swords="DPS", rdps="DPS", mdps="DPS", boomi="DPS", boomie="DPS",
+  ret="DPS", retri="DPS", destro="DPS", aff="DPS", demo="DPS",
+  rdrood="HEALER", hpriest="HEALER",
+  ["+tank"]="TANK", ["+heal"]="HEALER", ["+heals"] = "HEALER", ["+dps"] = "DPS", rsham="HEALER", hpala="HEALER", restosham="HEALER", restoshaman="HEALER", ["tank+"]="TANK", ["heal+"]="HEALER", ["heals+"] = "HEALER", ["dps+"] = "DPS"
 }
 
 local CLASS_KEY = {
@@ -241,14 +245,16 @@ local CLASS_KEY = {
 local SPEC2CLASS = {
   frost="mage", fire="mage", arcane="mage",
   shadow="priest", holy="priest", sp="priest",
-  disc="priest", discipline="priest", spriest="priest", rsham="Shaman", sham="Shaman",
-  ret="paladin", retribution="paladin", prot="paladin", pal="paladin", pala="paladin",
+  disc="priest", discipline="priest", spriest="priest", pri="priest", shadowpriest="priest",
+  rsham="shaman", sham="shaman", sha="shaman", shammy="shaman", elesham="shaman",
+  ret="paladin", retribution="paladin", retri="paladin", prot="paladin", pal="paladin", pala="paladin", pally="paladin", paly="paladin", protpal="paladin", protpala="paladin",
   enhance="shaman", enhancement="shaman", elemental="shaman", ele="shaman",
-  feral="druid", balance="druid", boomkin="druid", bear="druid", cat="druid", drood="druid",
-  aff="warlock", affliction="warlock", demo="warlock", demonology="warlock", destro="warlock", destruction="warlock", lock="warlock",
+  feral="druid", balance="druid", boomkin="druid", bear="druid", cat="druid", drood="druid", dru="druid", drui="druid", feraldruid="druid",
+  aff="warlock", affliction="warlock", demo="warlock", demonology="warlock", destro="warlock", destruction="warlock", lock="warlock", wlock="warlock", wl="warlock",
   mm="hunter", marks="hunter", marksmanship="hunter", survival="hunter", bm="hunter", hunt="hunter",
-  combat="rogue", assassination="rogue", assassin="rogue", subtlety="rogue", sub="rogue",
-  fury="warrior", arms="warrior", war="warrior", warr="warrior", protection="warrior"
+  combat="rogue", assassination="rogue", assassin="rogue", subtlety="rogue", sub="rogue", rog="rogue",
+  fury="warrior", arms="warrior", war="warrior", warr="warrior", protection="warrior", protwar="warrior",
+  mag="mage"
 }
 
 local ROLE_LET  = { TANK="T", HEALER="H", DPS="D" }
@@ -582,7 +588,10 @@ local function GetAssignedCounts()
   return ct, ch, cd
 end
 
--- choose lowest fill %, T/H equal priority; if both T & H are full and D is offered -> pick D
+-- Pick role in priority order:
+-- 1) Missing tank/healer slots first (tank wins ties over healer)
+-- 2) If T/H are full, fall back to DPS when offered
+-- 3) If nothing is missing, keep deterministic order T > H > D
 local function PickBestRole(offeredLetters)
   if not offeredLetters or table.getn(offeredLetters)==0 then return "D" end
 
@@ -590,11 +599,6 @@ local function PickBestRole(offeredLetters)
   local haveT, haveH, haveD = GetAssignedCounts()
 
   local missing = { T = math.max(needT - haveT, 0), H = math.max(needH - haveH, 0), D = math.max(needD - haveD, 0) }
-  local ratio   = {
-    T = (needT>0 and (haveT/needT) or 1e9),
-    H = (needH>0 and (haveH/needH) or 1e9),
-    D = (needD>0 and (haveD/needD) or 1e9),
-  }
 
   local hasT, hasH, hasD = false, false, false
   for i=1,table.getn(offeredLetters) do
@@ -603,22 +607,17 @@ local function PickBestRole(offeredLetters)
     hasD = hasD or offeredLetters[i]=="D"
   end
 
-  if hasT and hasH and missing.T == 0 and missing.H == 0 and hasD then
+  if hasT and missing.T > 0 then return "T" end
+  if hasH and missing.H > 0 then return "H" end
+
+  if hasD and missing.T == 0 and missing.H == 0 then
     return "D"
   end
 
-  local best, bestRatio, bestMissing
-  for j=1,table.getn(offeredLetters) do
-    local r = offeredLetters[j]
-    if (r == "T" or r == "H") or (not hasT and not hasH) then
-      local rr = ratio[r]
-      if (best==nil) or (rr < bestRatio) or (rr == bestRatio and missing[r] > bestMissing) then
-        best, bestRatio, bestMissing = r, rr, missing[r]
-      end
-    end
-  end
-
-  return best or offeredLetters[1]
+  if hasT then return "T" end
+  if hasH then return "H" end
+  if hasD then return "D" end
+  return offeredLetters[1]
 end
 
 -- invite helpers
