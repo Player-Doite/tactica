@@ -166,7 +166,7 @@ local BUTTON_KEY_DPS    = "TACTICA_TOGGLE_DPS"
 local BUTTON_KEY_TANK   = "TACTICA_TOGGLE_TANK" -- Tactica own Tank option (conditionally added)
 local BUTTON_KEY_ML     = "TACTICA_PRESET_ML"
 local IsSelfRaidLeader
-local ML_TAG_OFFSET_AFTER_CLASS = 1
+local ML_TAG_OFFSET_AFTER_CLASS = -10
 
 -- Tag sits just left of the name
 local OFFSET_BEFORE_NAME_DEFAULT = 2
