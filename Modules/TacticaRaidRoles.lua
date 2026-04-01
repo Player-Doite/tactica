@@ -241,6 +241,13 @@ function TacticaRaidRoles_SetPresetMasterLooter(nameOrEmpty)
     SendAddonMessage("TACTICA", "M::" .. name, "RAID")
   end
   ApplyPresetMasterLooterNow(name)
+  if name ~= "" then
+    local me = UnitName and UnitName("player") or ""
+    local whisperOn = (TacticaDB and TacticaDB.Settings and TacticaDB.Settings.RoleWhisperEnabled ~= false)
+    if whisperOn and me ~= "" and name ~= me and UnitInRaid("player") and IsSelfRaidLeader() then
+      SendChatMessage("[Tactica]: You have been selected as preset masterlooter. If masterloot is turned on, you will automatically receive the role.", "WHISPER", nil, name)
+    end
+  end
   if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
   if type(Tactica_DecoratePartyFrames) == "function" then Tactica_DecoratePartyFrames() end
   NotifyBuilder()
