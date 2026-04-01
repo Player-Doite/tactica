@@ -190,13 +190,36 @@ local function RaidMembersChronological()
   return t
 end
 
+local function GetRaidLeaderNameForLabel()
+  if not InRaid() then return "raidlead" end
+  for i=1, (GetNumRaidMembers() or 0) do
+    local n, rank = GetRaidRosterInfo(i)
+    if rank == 2 then return n or "raidlead" end
+  end
+  return "raidlead"
+end
+
+local function SetDropdownEnabled(dd, enabled)
+  if not dd then return end
+  if dd.EnableMouse then dd:EnableMouse(enabled and true or false) end
+  dd:SetAlpha(enabled and 1.0 or 0.55)
+  local btn = dd.GetName and getglobal(dd:GetName().."Button") or nil
+  if btn then
+    if enabled and btn.Enable then btn:Enable()
+    elseif (not enabled) and btn.Disable then btn:Disable() end
+  end
+end
+
 local function InitPresetMLDropdown(dd)
   UIDropDownMenu_Initialize(dd, function()
     local info = {
-      text = "None/raidlead",
+      text = "None/"..(GetRaidLeaderNameForLabel() or "raidlead"),
       func = function()
         SelectedPresetML = ""
-        UIDropDownMenu_SetText("None/raidlead", dd)
+        UIDropDownMenu_SetText("None/"..(GetRaidLeaderNameForLabel() or "raidlead"), dd)
+        if InRaid() and IsRL() and type(TacticaRaidRoles_SetPresetMasterLooter) == "function" then
+          TacticaRaidRoles_SetPresetMasterLooter("")
+        end
       end
     }
     UIDropDownMenu_AddButton(info)
@@ -208,6 +231,9 @@ local function InitPresetMLDropdown(dd)
         func = function()
           SelectedPresetML = nm
           UIDropDownMenu_SetText(nm, dd)
+          if InRaid() and IsRL() and type(TacticaRaidRoles_SetPresetMasterLooter) == "function" then
+            TacticaRaidRoles_SetPresetMasterLooter(nm)
+          end
         end
       })
     end
@@ -218,7 +244,7 @@ local function CreateLootPopup()
   if LootFrame then return end
 
   local f = CreateFrame("Frame", "TacticaLootPopup", UIParent)
-  f:SetWidth(280); f:SetHeight(190)
+  f:SetWidth(235); f:SetHeight(190)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   f:SetBackdrop({
     bgFile  = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -256,21 +282,20 @@ local function CreateLootPopup()
     end
   end)
 
-  local mlLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-  mlLabel:SetPoint("TOPLEFT", f, "TOPLEFT", 20, -90)
-  if mlLabel.SetTextColor then mlLabel:SetTextColor(1.0, 0.82, 0) end
+  local mlLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+  mlLabel:SetPoint("TOP", f, "TOP", 0, -78)
   mlLabel:SetText("Preset Masterlooter:")
 
   local mlDD = CreateFrame("Frame", "TacticaLootMLDropdown", f, "UIDropDownMenuTemplate")
-  mlDD:SetPoint("TOPLEFT", f, "TOPLEFT", 95, -79)
-  mlDD:SetWidth(160)
+  mlDD:SetPoint("TOP", f, "TOP", 15, -90)
+  mlDD:SetWidth(200)
   LootMLDropdown = mlDD
   InitPresetMLDropdown(mlDD)
 
   -- “Don’t ask again this raid”
   local cb = CreateFrame("CheckButton", "TacticaLootDontAskCB", f, "UICheckButtonTemplate")
   cb:SetWidth(24); cb:SetHeight(24)
-  cb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 35, 52)
+  cb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 35, 40)
   local cbText = getglobal("TacticaLootDontAskCBText")
   if cbText then cbText:SetText("Don't ask again this raid") end
   DontAskCB = cb
@@ -286,9 +311,6 @@ local function CreateLootPopup()
       cf:AddMessage("|cffff5555Tactica:|r Only the raid leader can change loot method.")
       f:Hide()
       return
-    end
-    if InRaid() and IsRL() and type(TacticaRaidRoles_SetPresetMasterLooter) == "function" then
-      TacticaRaidRoles_SetPresetMasterLooter(SelectedPresetML or "")
     end
     local method = SelectedMethod or "group"
     if method == "master" then
@@ -340,7 +362,8 @@ function TacticaLoot_ShowPopup()
   if LootMLDropdown then
     InitPresetMLDropdown(LootMLDropdown)
     SelectedPresetML = (GetPresetMasterLooter() or "")
-    UIDropDownMenu_SetText((SelectedPresetML ~= "" and SelectedPresetML) or "None/raidlead", LootMLDropdown)
+    UIDropDownMenu_SetText((SelectedPresetML ~= "" and SelectedPresetML) or ("None/"..(GetRaidLeaderNameForLabel() or "raidlead")), LootMLDropdown)
+    SetDropdownEnabled(LootMLDropdown, InRaid() and IsRL())
   end
   LootFrame:Show()
 end

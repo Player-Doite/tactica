@@ -216,6 +216,9 @@ function TacticaRaidRoles_SetPresetMasterLooter(nameOrEmpty)
   end
 
   SetMasterLooterPreset(name)
+  if UnitInRaid("player") and IsSelfRaidLeader() then
+    SendAddonMessage("TACTICA", "M::" .. name, "RAID")
+  end
   if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
   if type(Tactica_DecoratePartyFrames) == "function" then Tactica_DecoratePartyFrames() end
   NotifyBuilder()
@@ -581,11 +584,10 @@ local function HandleMenuClick()
     end
     local current = TacticaDB.MasterLooter or ""
     local nextName = (current == name) and "" or name
-    SetMasterLooterPreset(nextName)
-    Broadcast_SetML(nextName)
+    TacticaRaidRoles_SetPresetMasterLooter(nextName)
     if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
     NotifyBuilder()
-    local msg = (nextName ~= "") and (nextName .. " preset as ML.") or "Preset ML cleared (None/raidlead)."
+    local msg = (nextName ~= "") and (nextName .. " preset as ML.") or "Preset ML cleared."
     (DEFAULT_CHAT_FRAME or ChatFrame1):AddMessage("|cff33ff99Tactica:|r " .. msg)
     return
   elseif Tactica_hasPfUI and External_Tank_Key and key == External_Tank_Key then
@@ -752,6 +754,7 @@ local function GetOrCreateMLTag(btn)
 end
 
 local function GetListNameFS(i) return getglobal("RaidGroupButton"..i.."Name") end
+local function GetListClassFS(i) return getglobal("RaidGroupButton"..i.."Class") end
 
 local function GetGridNameFS(btn, name)
   local base = btn:GetName()
@@ -776,6 +779,15 @@ local function GetGridNameFS(btn, name)
   return nil
 end
 
+local function GetGridClassFS(btn)
+  local base = btn and btn:GetName()
+  if base then
+    local fs = getglobal(base.."Class")
+    if fs and fs.GetText then return fs end
+  end
+  return nil
+end
+
 local function Decorate_ListButtons()
   local any = false
   for i = 1, 40 do
@@ -788,6 +800,7 @@ local function Decorate_ListButtons()
       if (not name or name == "") and btn.name then name = btn.name end
 
       local nameFS = GetListNameFS(i)
+      local classFS = GetListClassFS(i)
       local tagFS = GetOrCreateTag(btn)
       local mlFS = GetOrCreateMLTag(btn)
       tagFS:ClearAllPoints()
@@ -796,7 +809,8 @@ local function Decorate_ListButtons()
         tagFS:SetPoint("RIGHT", nameFS, "LEFT", OFFSET_BEFORE_NAME_ACTIVE, 0)
         local tag = BuildRoleTag(name)
         if tag ~= "" then tagFS:SetText(tag); tagFS:Show() else tagFS:SetText(""); tagFS:Hide() end
-        mlFS:SetPoint("LEFT", nameFS, "RIGHT", 2, 0)
+        local anchorFS = classFS and classFS:IsShown() and classFS or nameFS
+        mlFS:SetPoint("LEFT", anchorFS, "RIGHT", 2, 0)
         if name and TacticaDB.MasterLooter and name == TacticaDB.MasterLooter then
           mlFS:SetText("ML"); mlFS:Show()
         else
@@ -822,6 +836,7 @@ local function Decorate_GroupGrid()
         if (not name or name == "") and btn.unit then name = UnitName(btn.unit) end
 
         local nameFS = GetGridNameFS(btn, name)
+        local classFS = GetGridClassFS(btn)
         local tagFS = GetOrCreateTag(btn)
         local mlFS = GetOrCreateMLTag(btn)
         tagFS:ClearAllPoints()
@@ -830,7 +845,8 @@ local function Decorate_GroupGrid()
           tagFS:SetPoint("RIGHT", nameFS, "LEFT", OFFSET_BEFORE_NAME_ACTIVE, 0)
           local tag = BuildRoleTag(name)
           if tag ~= "" then tagFS:SetText(tag); tagFS:Show() else tagFS:SetText(""); tagFS:Hide() end
-          mlFS:SetPoint("LEFT", nameFS, "RIGHT", 2, 0)
+          local anchorFS = classFS and classFS:IsShown() and classFS or nameFS
+          mlFS:SetPoint("LEFT", anchorFS, "RIGHT", 2, 0)
           if name and TacticaDB.MasterLooter and name == TacticaDB.MasterLooter then
             mlFS:SetText("ML"); mlFS:Show()
           else
