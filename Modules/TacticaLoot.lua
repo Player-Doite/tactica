@@ -132,6 +132,17 @@ local function CountRemainingLootSlots()
   return remaining
 end
 
+local function ApplyPresetIfMasterLoot()
+  if not (InRaid() and IsRL()) then return end
+  local preset = GetPresetMasterLooter()
+  if not preset or preset == "" then return end
+  local method = GetLootMethod and GetLootMethod()
+  if method ~= "master" then return end
+  local current = GetMasterLooterName()
+  if NormalizeName(current) == NormalizeName(preset) then return end
+  SetLootMethod("master", preset)
+end
+
 -------------------------------------------------
 -- Raid-scoped "don't ask again"
 -------------------------------------------------
@@ -180,16 +191,6 @@ local LOOT_METHODS = {
   { text = "Master Looter",     value = "master" },
 }
 
-local function RaidMembersChronological()
-  local t = {}
-  if not InRaid() then return t end
-  for i=1, (GetNumRaidMembers() or 0) do
-    local n = GetRaidRosterInfo(i)
-    if n and n ~= "" then table.insert(t, n) end
-  end
-  return t
-end
-
 local function GetRaidLeaderNameForLabel()
   if not InRaid() then return "raidlead" end
   for i=1, (GetNumRaidMembers() or 0) do
@@ -197,6 +198,17 @@ local function GetRaidLeaderNameForLabel()
     if rank == 2 then return n or "raidlead" end
   end
   return "raidlead"
+end
+
+local function RaidMembersChronological()
+  local t = {}
+  if not InRaid() then return t end
+  local leader = GetRaidLeaderNameForLabel()
+  for i=1, (GetNumRaidMembers() or 0) do
+    local n = GetRaidRosterInfo(i)
+    if n and n ~= "" and n ~= leader then table.insert(t, n) end
+  end
+  return t
 end
 
 local function SetDropdownEnabled(dd, enabled)
@@ -283,7 +295,7 @@ local function CreateLootPopup()
   end)
 
   local mlLabel = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  mlLabel:SetPoint("TOP", f, "TOP", 0, -78)
+  mlLabel:SetPoint("TOP", f, "TOP", 0, -75)
   mlLabel:SetText("Preset Masterlooter:")
 
   local mlDD = CreateFrame("Frame", "TacticaLootMLDropdown", f, "UIDropDownMenuTemplate")
@@ -411,6 +423,7 @@ f:RegisterEvent("LOOT_OPENED")
 f:RegisterEvent("LOOT_SLOT_CLEARED")
 f:RegisterEvent("LOOT_CLOSED")
 f:RegisterEvent("CHAT_MSG_ADDON")
+f:RegisterEvent("PARTY_LOOT_METHOD_CHANGED")
 
 f:SetScript("OnEvent", function()
   EnsureLootDefaults()
@@ -503,5 +516,7 @@ f:SetScript("OnEvent", function()
     if not (ml and sender and NormalizeName(sender) == NormalizeName(ml)) then return end
 
     TacticaLoot_ShowPopup()
+  elseif event == "PARTY_LOOT_METHOD_CHANGED" then
+    ApplyPresetIfMasterLoot()
   end
 end)

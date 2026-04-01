@@ -166,6 +166,7 @@ local BUTTON_KEY_DPS    = "TACTICA_TOGGLE_DPS"
 local BUTTON_KEY_TANK   = "TACTICA_TOGGLE_TANK" -- Tactica own Tank option (conditionally added)
 local BUTTON_KEY_ML     = "TACTICA_PRESET_ML"
 local IsSelfRaidLeader
+local ML_TAG_OFFSET_AFTER_CLASS = 1
 
 -- Tag sits just left of the name
 local OFFSET_BEFORE_NAME_DEFAULT = 2
@@ -194,6 +195,26 @@ local function SetMasterLooterPreset(nameOrEmpty)
   TacticaDB.MasterLooter = nameOrEmpty or ""
 end
 
+local function CurrentRaidLeaderName()
+  local n = GetNumRaidMembers and GetNumRaidMembers() or 0
+  for i=1,n do
+    local nm, rank = GetRaidRosterInfo(i)
+    if rank == 2 then return nm end
+  end
+  return UnitName and UnitName("player") or nil
+end
+
+local function ApplyPresetMasterLooterNow(nameOrEmpty)
+  if not (UnitInRaid("player") and IsSelfRaidLeader()) then return end
+  local method = GetLootMethod and GetLootMethod() or nil
+  if method ~= "master" then return end
+  local target = nameOrEmpty
+  if not target or target == "" then target = CurrentRaidLeaderName() end
+  if target and target ~= "" then
+    SetLootMethod("master", target)
+  end
+end
+
 function TacticaRaidRoles_GetPresetMasterLooter()
   EnsureDB()
   return TacticaDB.MasterLooter or ""
@@ -219,6 +240,7 @@ function TacticaRaidRoles_SetPresetMasterLooter(nameOrEmpty)
   if UnitInRaid("player") and IsSelfRaidLeader() then
     SendAddonMessage("TACTICA", "M::" .. name, "RAID")
   end
+  ApplyPresetMasterLooterNow(name)
   if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
   if type(Tactica_DecoratePartyFrames) == "function" then Tactica_DecoratePartyFrames() end
   NotifyBuilder()
@@ -810,7 +832,7 @@ local function Decorate_ListButtons()
         local tag = BuildRoleTag(name)
         if tag ~= "" then tagFS:SetText(tag); tagFS:Show() else tagFS:SetText(""); tagFS:Hide() end
         local anchorFS = classFS and classFS:IsShown() and classFS or nameFS
-        mlFS:SetPoint("LEFT", anchorFS, "RIGHT", 2, 0)
+        mlFS:SetPoint("LEFT", anchorFS, "RIGHT", ML_TAG_OFFSET_AFTER_CLASS, 0)
         if name and TacticaDB.MasterLooter and name == TacticaDB.MasterLooter then
           mlFS:SetText("ML"); mlFS:Show()
         else
@@ -846,7 +868,7 @@ local function Decorate_GroupGrid()
           local tag = BuildRoleTag(name)
           if tag ~= "" then tagFS:SetText(tag); tagFS:Show() else tagFS:SetText(""); tagFS:Hide() end
           local anchorFS = classFS and classFS:IsShown() and classFS or nameFS
-          mlFS:SetPoint("LEFT", anchorFS, "RIGHT", 2, 0)
+          mlFS:SetPoint("LEFT", anchorFS, "RIGHT", ML_TAG_OFFSET_AFTER_CLASS, 0)
           if name and TacticaDB.MasterLooter and name == TacticaDB.MasterLooter then
             mlFS:SetText("ML"); mlFS:Show()
           else

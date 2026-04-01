@@ -2290,16 +2290,6 @@ TacticaDB.disablePopupThisRaid = TacticaDB.disablePopupThisRaid or false
 local selfWasInRaid = false
 local popupShownThisRaid = false
 
-local function RB_RaidNamesInOrder()
-    local names = {}
-    local n = GetNumRaidMembers and GetNumRaidMembers() or 0
-    for i=1,n do
-      local nm = GetRaidRosterInfo(i)
-      if nm and nm ~= "" then table.insert(names, nm) end
-    end
-    return names
-end
-
 local function RB_LeaderNameForNoneLabel()
     local n = GetNumRaidMembers and GetNumRaidMembers() or 0
     for i=1,n do
@@ -2307,6 +2297,17 @@ local function RB_LeaderNameForNoneLabel()
       if rank == 2 then return nm or "raidlead" end
     end
     return "raidlead"
+end
+
+local function RB_RaidNamesInOrder()
+    local names = {}
+    local leader = RB_LeaderNameForNoneLabel()
+    local n = GetNumRaidMembers and GetNumRaidMembers() or 0
+    for i=1,n do
+      local nm = GetRaidRosterInfo(i)
+      if nm and nm ~= "" and nm ~= leader then table.insert(names, nm) end
+    end
+    return names
 end
 
 local function RB_SetDropdownEnabled(dd, enabled)
