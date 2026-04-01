@@ -19,6 +19,7 @@ local function EnsureDB()
   if not TacticaDB.Healers then TacticaDB.Healers = {} end
   if not TacticaDB.DPS    then TacticaDB.DPS    = {} end
   if not TacticaDB.Tanks  then TacticaDB.Tanks  = {} end
+  if TacticaDB.MasterLooter == nil then TacticaDB.MasterLooter = "" end
   if TacticaDB.wasInRaid == nil then TacticaDB.wasInRaid = false end
   if TacticaDB.RaidSignature ~= nil then TacticaDB.RaidSignature = nil end
 end
@@ -163,6 +164,9 @@ end
 local BUTTON_KEY_HEALER = "TACTICA_TOGGLE_HEALER"
 local BUTTON_KEY_DPS    = "TACTICA_TOGGLE_DPS"
 local BUTTON_KEY_TANK   = "TACTICA_TOGGLE_TANK" -- Tactica own Tank option (conditionally added)
+local BUTTON_KEY_ML     = "TACTICA_PRESET_ML"
+local IsSelfRaidLeader
+local ML_TAG_OFFSET_AFTER_CLASS = -10
 
 -- Tag sits just left of the name
 local OFFSET_BEFORE_NAME_DEFAULT = 2
@@ -185,6 +189,69 @@ local function GetCurrentRole(name)
   if TacticaDB.Healers[name] then return "H" end
   if TacticaDB.DPS[name]    then return "D" end
   return nil
+end
+
+local function SetMasterLooterPreset(nameOrEmpty)
+  TacticaDB.MasterLooter = nameOrEmpty or ""
+end
+
+local function CurrentRaidLeaderName()
+  local n = GetNumRaidMembers and GetNumRaidMembers() or 0
+  for i=1,n do
+    local nm, rank = GetRaidRosterInfo(i)
+    if rank == 2 then return nm end
+  end
+  return UnitName and UnitName("player") or nil
+end
+
+local function ApplyPresetMasterLooterNow(nameOrEmpty)
+  if not (UnitInRaid("player") and IsSelfRaidLeader()) then return end
+  local method = GetLootMethod and GetLootMethod() or nil
+  if method ~= "master" then return end
+  local target = nameOrEmpty
+  if not target or target == "" then target = CurrentRaidLeaderName() end
+  if target and target ~= "" then
+    SetLootMethod("master", target)
+  end
+end
+
+function TacticaRaidRoles_GetPresetMasterLooter()
+  EnsureDB()
+  return TacticaDB.MasterLooter or ""
+end
+
+function TacticaRaidRoles_SetPresetMasterLooter(nameOrEmpty)
+  EnsureDB()
+  if not UnitInRaid("player") then return false, "not in raid" end
+  if not IsSelfRaidLeader() then return false, "only raid leader can set preset ML" end
+
+  local name = nameOrEmpty or ""
+  if name ~= "" then
+    local found = false
+    local n = GetNumRaidMembers and GetNumRaidMembers() or 0
+    for i=1,n do
+      local r = GetRaidRosterInfo(i)
+      if r == name then found = true; break end
+    end
+    if not found then return false, "player not found in raid" end
+  end
+
+  SetMasterLooterPreset(name)
+  if UnitInRaid("player") and IsSelfRaidLeader() then
+    SendAddonMessage("TACTICA", "M::" .. name, "RAID")
+  end
+  ApplyPresetMasterLooterNow(name)
+  if name ~= "" then
+    local me = UnitName and UnitName("player") or ""
+    local whisperOn = (TacticaDB and TacticaDB.Settings and TacticaDB.Settings.RoleWhisperEnabled ~= false)
+    if whisperOn and me ~= "" and name ~= me and UnitInRaid("player") and IsSelfRaidLeader() then
+      SendChatMessage("[Tactica]: You have been selected as preset masterlooter. If masterloot is turned on, you will automatically receive the role.", "WHISPER", nil, name)
+    end
+  end
+  if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
+  if type(Tactica_DecoratePartyFrames) == "function" then Tactica_DecoratePartyFrames() end
+  NotifyBuilder()
+  return true
 end
 
 local function FindUnitByName(name)
@@ -291,10 +358,26 @@ local function IsLeaderOrAssistByName(name)
   return false
 end
 
+local function IsRaidLeaderByName(name)
+  if not name or name == "" then return false end
+  local n = GetNumRaidMembers and GetNumRaidMembers() or 0
+  for i = 1, n do
+    local rname, rank = GetRaidRosterInfo(i)
+    if rname and rname == name then
+      return rank == 2
+    end
+  end
+  return false
+end
+
 local function IsSelfLeaderOrAssist()
   if not UnitInRaid("player") then return false end
   local me = UnitName and UnitName("player") or nil
   return IsLeaderOrAssistByName(me)
+end
+
+IsSelfRaidLeader = function()
+  return (IsRaidLeader and IsRaidLeader() == 1) or false
 end
 
 ------------------------------------------------------------
@@ -337,6 +420,12 @@ local function Broadcast_ClearAll()
   SendAddonMessage(ADDON_PREFIX, "X::CLEARALL", "RAID")
 end
 
+local function Broadcast_SetML(name)
+  if not UnitInRaid("player") then return end
+  if not IsSelfRaidLeader() then return end
+  SendAddonMessage(ADDON_PREFIX, "M::" .. (name or ""), "RAID")
+end
+
 local function Broadcast_FullList()
   if not UnitInRaid("player") then return 0 end
   if not IsSelfLeaderOrAssist() then return 0 end
@@ -344,6 +433,7 @@ local function Broadcast_FullList()
   for name, v in pairs(TacticaDB.Healers) do if v then SendAddonMessage(ADDON_PREFIX, "S:H:"..name, "RAID"); count = count + 1 end end
   for name, v in pairs(TacticaDB.DPS)     do if v then SendAddonMessage(ADDON_PREFIX, "S:D:"..name, "RAID"); count = count + 1 end end
   for name, v in pairs(TacticaDB.Tanks)   do if v then SendAddonMessage(ADDON_PREFIX, "S:T:"..name, "RAID"); count = count + 1 end end
+  SendAddonMessage(ADDON_PREFIX, "M::" .. (TacticaDB.MasterLooter or ""), "RAID")
   return count
 end
 
@@ -384,10 +474,19 @@ local function OnAddonMessage()
     TacticaDB.Healers = {}
     TacticaDB.DPS = {}
     TacticaDB.Tanks = {}
+    TacticaDB.MasterLooter = ""
     Pfui_ReapplyAllTanks()
     if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
 	NotifyBuilder();
     (DEFAULT_CHAT_FRAME or ChatFrame1):AddMessage("|cff33ff99Tactica:|r Role tags cleared (cleared by officer).")
+    return
+  end
+
+  if t == "M" and r == "" then
+    if not IsRaidLeaderByName(sender) then return end
+    SetMasterLooterPreset(n or "")
+    if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
+    NotifyBuilder()
     return
   end
 
@@ -437,6 +536,9 @@ local function AddMenuButton()
   if not UnitPopupButtons[BUTTON_KEY_TANK] then
     UnitPopupButtons[BUTTON_KEY_TANK] = { text = "Toggle as Tank", dist = 0 }
   end
+  if not UnitPopupButtons[BUTTON_KEY_ML] then
+    UnitPopupButtons[BUTTON_KEY_ML] = { text = "Preset Masterlooter", dist = 0 }
+  end
 
   -- Decides whether to HIDE Tactica Tank based on pfUI + SuperWoW
   -- Rule: only hide if BOTH pfUI and SuperWoW are present.
@@ -456,6 +558,7 @@ local function AddMenuButton()
     ensureItem(menu, BUTTON_KEY_HEALER, 3)
     ensureItem(menu, BUTTON_KEY_DPS,    4)
     if not hideOurTank then ensureItem(menu, BUTTON_KEY_TANK, 5) end
+    ensureItem(menu, BUTTON_KEY_ML,      6)
   end
 
   -- Insert into PARTY menu (right-click party frames)
@@ -464,6 +567,7 @@ local function AddMenuButton()
     ensureItem(menu, BUTTON_KEY_HEALER, 3)
     ensureItem(menu, BUTTON_KEY_DPS,    4)
     if not hideOurTank then ensureItem(menu, BUTTON_KEY_TANK, 5) end
+    ensureItem(menu, BUTTON_KEY_ML,      6)
   end
   
   -- Insert into PLAYER menu (generic other-player unit menu)
@@ -472,6 +576,7 @@ local function AddMenuButton()
     ensureItem(menu, BUTTON_KEY_HEALER, 3)
     ensureItem(menu, BUTTON_KEY_DPS,    4)
     ensureItem(menu, BUTTON_KEY_TANK,   5)
+    ensureItem(menu, BUTTON_KEY_ML,     6)
   end
 
   menuInjected = true
@@ -500,6 +605,20 @@ local function HandleMenuClick()
   if key == BUTTON_KEY_HEALER then roleWanted = "H"
   elseif key == BUTTON_KEY_DPS  then roleWanted = "D"
   elseif key == BUTTON_KEY_TANK then roleWanted = "T"
+  elseif key == BUTTON_KEY_ML then
+    if not UnitInRaid("player") then return end
+    if not IsSelfRaidLeader() then
+      (DEFAULT_CHAT_FRAME or ChatFrame1):AddMessage("|cffff5555Tactica:|r Only raid leader can preset master looter.")
+      return
+    end
+    local current = TacticaDB.MasterLooter or ""
+    local nextName = (current == name) and "" or name
+    TacticaRaidRoles_SetPresetMasterLooter(nextName)
+    if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
+    NotifyBuilder()
+    local msg = (nextName ~= "") and (nextName .. " preset as ML.") or "Preset ML cleared."
+    (DEFAULT_CHAT_FRAME or ChatFrame1):AddMessage("|cff33ff99Tactica:|r " .. msg)
+    return
   elseif Tactica_hasPfUI and External_Tank_Key and key == External_Tank_Key then
     roleWanted = "T"; isExternalPfuiTank = true
   else
@@ -651,7 +770,20 @@ local function GetOrCreateTag(btn)
   return btn.TacticaRoleTag
 end
 
+local function GetOrCreateMLTag(btn)
+  if not btn.TacticaMLTag then
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    btn.TacticaMLTag = fs
+    btn.TacticaMLTag:SetTextColor(1, 0.82, 0)
+    btn.TacticaMLTag:SetJustifyH("LEFT")
+    local fpath, fsize = btn.TacticaMLTag:GetFont()
+    if fpath and fsize then btn.TacticaMLTag:SetFont(fpath, math.max(8, fsize - 2)) end
+  end
+  return btn.TacticaMLTag
+end
+
 local function GetListNameFS(i) return getglobal("RaidGroupButton"..i.."Name") end
+local function GetListClassFS(i) return getglobal("RaidGroupButton"..i.."Class") end
 
 local function GetGridNameFS(btn, name)
   local base = btn:GetName()
@@ -676,6 +808,15 @@ local function GetGridNameFS(btn, name)
   return nil
 end
 
+local function GetGridClassFS(btn)
+  local base = btn and btn:GetName()
+  if base then
+    local fs = getglobal(base.."Class")
+    if fs and fs.GetText then return fs end
+  end
+  return nil
+end
+
 local function Decorate_ListButtons()
   local any = false
   for i = 1, 40 do
@@ -688,14 +829,25 @@ local function Decorate_ListButtons()
       if (not name or name == "") and btn.name then name = btn.name end
 
       local nameFS = GetListNameFS(i)
+      local classFS = GetListClassFS(i)
       local tagFS = GetOrCreateTag(btn)
+      local mlFS = GetOrCreateMLTag(btn)
       tagFS:ClearAllPoints()
+      mlFS:ClearAllPoints()
       if nameFS and nameFS:IsShown() then
         tagFS:SetPoint("RIGHT", nameFS, "LEFT", OFFSET_BEFORE_NAME_ACTIVE, 0)
         local tag = BuildRoleTag(name)
         if tag ~= "" then tagFS:SetText(tag); tagFS:Show() else tagFS:SetText(""); tagFS:Hide() end
+        local anchorFS = classFS and classFS:IsShown() and classFS or nameFS
+        mlFS:SetPoint("LEFT", anchorFS, "RIGHT", ML_TAG_OFFSET_AFTER_CLASS, 0)
+        if name and TacticaDB.MasterLooter and name == TacticaDB.MasterLooter then
+          mlFS:SetText("ML"); mlFS:Show()
+        else
+          mlFS:SetText(""); mlFS:Hide()
+        end
       else
         tagFS:SetText(""); tagFS:Hide()
+        mlFS:SetText(""); mlFS:Hide()
       end
     end
   end
@@ -713,14 +865,26 @@ local function Decorate_GroupGrid()
         if (not name or name == "") and btn.unit then name = UnitName(btn.unit) end
 
         local nameFS = GetGridNameFS(btn, name)
+        local classFS = GetGridClassFS(btn)
         local tagFS = GetOrCreateTag(btn)
+        local mlFS = GetOrCreateMLTag(btn)
         tagFS:ClearAllPoints()
+        mlFS:ClearAllPoints()
         if nameFS then
           tagFS:SetPoint("RIGHT", nameFS, "LEFT", OFFSET_BEFORE_NAME_ACTIVE, 0)
           local tag = BuildRoleTag(name)
           if tag ~= "" then tagFS:SetText(tag); tagFS:Show() else tagFS:SetText(""); tagFS:Hide() end
+          local anchorFS = classFS and classFS:IsShown() and classFS or nameFS
+          mlFS:SetPoint("LEFT", anchorFS, "RIGHT", ML_TAG_OFFSET_AFTER_CLASS, 0)
+          if name and TacticaDB.MasterLooter and name == TacticaDB.MasterLooter then
+            mlFS:SetText("ML"); mlFS:Show()
+          else
+            mlFS:SetText(""); mlFS:Hide()
+          end
         else
-          tagFS:SetText(""); tagFS:Hide() end
+          tagFS:SetText(""); tagFS:Hide()
+          mlFS:SetText(""); mlFS:Hide()
+        end
       end
     end
   end
@@ -871,6 +1035,7 @@ local function WipeRoles(reason)
   TacticaDB.Healers = {}
   TacticaDB.DPS = {}
   TacticaDB.Tanks = {}
+  TacticaDB.MasterLooter = ""
   Pfui_ReapplyAllTanks() -- mutate keys only
   if type(Tactica_DecorateRaidRoster) == "function" then Tactica_DecorateRaidRoster() end
   if (DEFAULT_CHAT_FRAME or ChatFrame1) then
@@ -1028,6 +1193,9 @@ f:SetScript("OnEvent", function()
         for n in pairs(TacticaDB.Healers) do if not present[n] then TacticaDB.Healers[n] = nil end end
         for n in pairs(TacticaDB.DPS)     do if not present[n] then TacticaDB.DPS[n]     = nil end end
         for n in pairs(TacticaDB.Tanks)   do if not present[n] then TacticaDB.Tanks[n]   = nil end end
+        if TacticaDB.MasterLooter and TacticaDB.MasterLooter ~= "" and not present[TacticaDB.MasterLooter] then
+          TacticaDB.MasterLooter = ""
+        end
 
         -- Keep pfUI tank flags aligned with the cleaned DB
         Pfui_ReapplyAllTanks()
