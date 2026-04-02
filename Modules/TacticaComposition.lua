@@ -17,6 +17,7 @@ local function EnsureDB()
   TacticaDB.Composition.current = TacticaDB.Composition.current or nil -- session-only, cleared when leaving raid
   TacticaDB.Composition.nameMap = TacticaDB.Composition.nameMap or {} -- persistent discordName -> { alias=true }
   TacticaDB.Composition.setupOverrides = TacticaDB.Composition.setupOverrides or {} -- session-only, cleared when leaving raid
+  TacticaDB.Composition.splitConfig = TacticaDB.Composition.splitConfig or nil -- session-only, cleared with import data
 end
 
 local function GetSetupOverrides()
@@ -30,6 +31,90 @@ local function ResetSetupOverrides()
   EnsureDB()
   TacticaDB.Composition.setupOverrides = {}
   if TC then TC.setupOverrides = TacticaDB.Composition.setupOverrides end
+end
+
+local function GetMaxGroupFromSlots(slots)
+  local maxGroup = 0
+  local i
+  for i=1,table.getn(slots or {}) do
+    local g = tonumber(slots[i].groupNumber) or 0
+    if g > maxGroup then maxGroup = g end
+  end
+  if maxGroup < 1 then maxGroup = 1 end
+  return maxGroup
+end
+
+local function NormalizeSplitConfig(splitConfig, maxGroup)
+  maxGroup = tonumber(maxGroup) or 1
+  if maxGroup < 1 then maxGroup = 1 end
+
+  local cfg = splitConfig or {}
+  local raids = cfg.raids or {}
+  local out = { raids = {}, activeRaid = tonumber(cfg.activeRaid) or 1 }
+  local i
+  for i=1,4 do
+    local row = raids[i]
+    local fromG = row and tonumber(row.fromGroup) or nil
+    local toG = row and tonumber(row.toGroup) or nil
+    if fromG and toG then
+      if fromG < 1 then fromG = 1 end
+      if toG < 1 then toG = 1 end
+      if fromG > maxGroup then fromG = maxGroup end
+      if toG > maxGroup then toG = maxGroup end
+      if fromG > toG then
+        local t = fromG; fromG = toG; toG = t
+      end
+      out.raids[i] = { fromGroup = fromG, toGroup = toG }
+    else
+      out.raids[i] = { fromGroup = nil, toGroup = nil }
+    end
+  end
+
+  if not (out.raids[1] and out.raids[1].fromGroup and out.raids[1].toGroup) then
+    out.raids[1] = { fromGroup = 1, toGroup = math.min(maxGroup, 8) }
+  end
+  if out.activeRaid < 1 or out.activeRaid > 4 then out.activeRaid = 1 end
+  if not out.raids[out.activeRaid] or not out.raids[out.activeRaid].fromGroup then out.activeRaid = 1 end
+  return out
+end
+
+local function GetActiveRaidRange(data)
+  EnsureDB()
+  local maxGroup = GetMaxGroupFromSlots(data and data.slots or {})
+  TacticaDB.Composition.splitConfig = NormalizeSplitConfig(TacticaDB.Composition.splitConfig, maxGroup)
+  local cfg = TacticaDB.Composition.splitConfig
+  local row = cfg.raids[cfg.activeRaid] or cfg.raids[1]
+  return row.fromGroup, row.toGroup
+end
+
+local function GetActiveSlots(data)
+  local out = {}
+  if not data or not data.slots then return out end
+  local fromG, toG = GetActiveRaidRange(data)
+  local activeSlots = GetActiveSlots(data)
+  local i
+  for i=1,table.getn(activeSlots) do
+    local slot = activeSlots[i]
+    local g = tonumber(slot.groupNumber) or 0
+    local sidx = tonumber(slot.slotNumber) or 0
+    if g >= fromG and g <= toG and sidx >= 1 and sidx <= 5 then
+      local mapped = g - fromG + 1
+      if mapped >= 1 and mapped <= 8 then
+        local copy = {
+          name = slot.name,
+          specName = slot.specName,
+          className = slot.className,
+          color = slot.color,
+          groupNumber = mapped,
+          originalGroupNumber = g,
+          slotNumber = sidx,
+          role = slot.role,
+        }
+        table.insert(out, copy)
+      end
+    end
+  end
+  return out
 end
 
 local function trim(s)
@@ -249,13 +334,15 @@ local function ParseCompositionJson(raw)
   return { raw = text, slots = slots, importedAt = time and time() or 0 }
 end
 
-local function ParseAndStoreCurrent(raw)
+local function ParseAndStoreCurrent(raw, splitConfig)
   local parsed = ParseCompositionJson(raw)
   if not parsed then
     cfmsg("Wrong format. Please paste the JSON export directly from Raid-Helper's Composition Tool.")
     return nil
   end
   TacticaDB.Composition.current = parsed
+  local maxGroup = GetMaxGroupFromSlots(parsed.slots)
+  TacticaDB.Composition.splitConfig = NormalizeSplitConfig(splitConfig, maxGroup)
   ResetSetupOverrides()
   return parsed
 end
@@ -349,8 +436,9 @@ function TC:BuildDesiredGroups()
   local members = getRaidMemberNamesLower()
   local defaults = {}
   local i
-  for i=1,table.getn(data.slots) do
-    local slot = data.slots[i]
+  local activeSlots = GetActiveSlots(data)
+  for i=1,table.getn(activeSlots) do
+    local slot = activeSlots[i]
     local sg = tonumber(slot.groupNumber) or 0
     local sidx = tonumber(slot.slotNumber) or 0
     if sg >= 1 and sg <= 8 and sidx >= 1 and sidx <= 5 then
@@ -406,8 +494,9 @@ function TC:BuildDesiredRoleMap()
   local defaults = {}
 
   local i
-  for i=1,table.getn(data.slots) do
-    local slot = data.slots[i]
+  local activeSlots = GetActiveSlots(data)
+  for i=1,table.getn(activeSlots) do
+    local slot = activeSlots[i]
     local g = tonumber(slot.groupNumber) or 0
     local sidx = tonumber(slot.slotNumber) or 0
     if g >= 1 and g <= 8 and sidx >= 1 and sidx <= 5 then
@@ -650,10 +739,184 @@ function TC:OpenSetupStep()
   self:ShowSetupFrame()
 end
 
+function TC:UpdateImportSplitControls(rawText)
+  if not self.importFrame then return end
+  local text = rawText or (self.importFrame.input and self.importFrame.input:GetText()) or ""
+  local parsed = ParseCompositionJson(text)
+  local hasValid = parsed ~= nil
+  SetAccentButtonEnabled(self.importFrame.btnSplitRaid, hasValid)
+
+  if not hasValid then
+    self.pendingSplitConfig = nil
+    if self.importFrame.splitDropDown then
+      self.importFrame.splitDropDown:Hide()
+      UIDropDownMenu_SetText("", self.importFrame.splitDropDown)
+    end
+    return
+  end
+
+  local maxGroup = GetMaxGroupFromSlots(parsed.slots)
+  local cfg = NormalizeSplitConfig(self.pendingSplitConfig or TacticaDB.Composition.splitConfig, maxGroup)
+  self.pendingSplitConfig = cfg
+
+  local labels = {}
+  local count = 0
+  local i
+  for i=1,4 do
+    local r = cfg.raids[i]
+    if r and r.fromGroup and r.toGroup then
+      count = count + 1
+      labels[i] = string.format("Raid %d (group %d-%d)", i, r.fromGroup, r.toGroup)
+    end
+  end
+
+  if count > 1 and self.importFrame.splitDropDown then
+    UIDropDownMenu_Initialize(self.importFrame.splitDropDown, function()
+      local idx
+      for idx=1,4 do
+        if labels[idx] then
+          local info = UIDropDownMenu_CreateInfo()
+          info.text = labels[idx]
+          info.notCheckable = 1
+          info.func = function()
+            self.pendingSplitConfig.activeRaid = idx
+            UIDropDownMenu_SetText(labels[idx], self.importFrame.splitDropDown)
+          end
+          UIDropDownMenu_AddButton(info)
+        end
+      end
+    end)
+    local activeLabel = labels[cfg.activeRaid] or labels[1]
+    UIDropDownMenu_SetText(activeLabel or "", self.importFrame.splitDropDown)
+    self.importFrame.splitDropDown:Show()
+  elseif self.importFrame.splitDropDown then
+    self.importFrame.splitDropDown:Hide()
+  end
+end
+
+function TC:ShowSplitRaidFrame()
+  if not self.importFrame then return end
+  local parsed = ParseCompositionJson(self.importFrame.input:GetText() or "")
+  if not parsed then return end
+  if not self.splitRaidFrame then self:CreateSplitRaidFrame() end
+
+  local maxGroup = GetMaxGroupFromSlots(parsed.slots)
+  local cfg = NormalizeSplitConfig(self.pendingSplitConfig or TacticaDB.Composition.splitConfig, maxGroup)
+  self.splitRaidFrame.maxGroup = maxGroup
+
+  local i
+  for i=1,4 do
+    local row = cfg.raids[i]
+    self.splitRaidFrame.rows[i].from:SetText((row and row.fromGroup) and tostring(row.fromGroup) or "")
+    self.splitRaidFrame.rows[i].to:SetText((row and row.toGroup) and tostring(row.toGroup) or "")
+  end
+
+  self.splitRaidFrame:Show()
+  self.splitRaidFrame:Raise()
+end
+
+function TC:CreateSplitRaidFrame()
+  local f = CreateFrame("Frame", "TacticaCompositionSplitRaidFrame", UIParent)
+  f:SetWidth(380); f:SetHeight(270)
+  f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+  f:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=24, insets={left=8,right=8,top=8,bottom=8} })
+  f:SetMovable(true); f:EnableMouse(true); f:SetToplevel(true); f:SetFrameStrata("FULLSCREEN_DIALOG")
+  f:RegisterForDrag("LeftButton")
+  f:SetScript("OnDragStart", function() this:StartMoving() end)
+  f:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+
+  local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  title:SetPoint("TOPLEFT", f, "TOPLEFT", 18, -18)
+  title:SetText("Split Raid")
+  title:SetTextColor(TITLE_R, TITLE_G, TITLE_B)
+
+  local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+  close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
+
+  local colFrom = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  colFrom:SetPoint("TOPLEFT", f, "TOPLEFT", 116, -48)
+  colFrom:SetText("From Group")
+  local colTo = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  colTo:SetPoint("LEFT", colFrom, "RIGHT", 96, 0)
+  colTo:SetText("To Group")
+
+  f.rows = {}
+  local i
+  for i=1,4 do
+    local y = -70 - ((i-1) * 34)
+    local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    lbl:SetPoint("TOPLEFT", f, "TOPLEFT", 20, y)
+    lbl:SetText("Raid "..i..":")
+
+    local from = CreateFrame("EditBox", nil, f)
+    from:SetAutoFocus(false)
+    from:SetFontObject(ChatFontNormal)
+    from:SetWidth(56); from:SetHeight(22)
+    from:SetPoint("LEFT", lbl, "RIGHT", 18, 0)
+    from:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
+    from:SetBackdropColor(0,0,0,0.85)
+    from:SetTextInsets(6, 6, 0, 0)
+
+    local toTxt = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    toTxt:SetPoint("LEFT", from, "RIGHT", 10, 0)
+    toTxt:SetText("to")
+
+    local to = CreateFrame("EditBox", nil, f)
+    to:SetAutoFocus(false)
+    to:SetFontObject(ChatFontNormal)
+    to:SetWidth(56); to:SetHeight(22)
+    to:SetPoint("LEFT", toTxt, "RIGHT", 10, 0)
+    to:SetBackdrop({ bgFile="Interface\\Tooltips\\UI-Tooltip-Background", edgeFile="Interface\\Tooltips\\UI-Tooltip-Border", tile=true, tileSize=16, edgeSize=12, insets={left=3,right=3,top=3,bottom=3} })
+    to:SetBackdropColor(0,0,0,0.85)
+    to:SetTextInsets(6, 6, 0, 0)
+
+    f.rows[i] = { from = from, to = to }
+  end
+
+  local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  cancel:SetWidth(90); cancel:SetHeight(24)
+  cancel:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 84, 16)
+  cancel:SetText("Cancel")
+  cancel:SetScript("OnClick", function() f:Hide() end)
+
+  local submit = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  submit:SetWidth(90); submit:SetHeight(24)
+  submit:SetPoint("LEFT", cancel, "RIGHT", 24, 0)
+  submit:SetText("Submit")
+  submit:SetScript("OnClick", function()
+    local maxGroup = f.maxGroup or 1
+    local cfg = { raids = {}, activeRaid = 1 }
+    local count = 0
+    local i
+    for i=1,4 do
+      local fromG = tonumber(trim(f.rows[i].from:GetText() or ""))
+      local toG = tonumber(trim(f.rows[i].to:GetText() or ""))
+      if fromG and toG then
+        if fromG < 1 then fromG = 1 end
+        if toG < 1 then toG = 1 end
+        if fromG > maxGroup then fromG = maxGroup end
+        if toG > maxGroup then toG = maxGroup end
+        if fromG > toG then local t = fromG; fromG = toG; toG = t end
+        cfg.raids[i] = { fromGroup = fromG, toGroup = toG }
+        count = count + 1
+      else
+        cfg.raids[i] = { fromGroup = nil, toGroup = nil }
+      end
+    end
+    cfg = NormalizeSplitConfig(cfg, maxGroup)
+    self.pendingSplitConfig = cfg
+    self:UpdateImportSplitControls(self.importFrame and self.importFrame.input and self.importFrame.input:GetText() or "")
+    f:Hide()
+  end)
+
+  self.splitRaidFrame = f
+end
+
 function TC:ShowImportFrame()
   EnsureDB()
   if not self.importFrame then self:CreateImportFrame() end
   local existing = TacticaDB.Composition.current and TacticaDB.Composition.current.raw or ""
+  self.pendingSplitConfig = TacticaDB.Composition.splitConfig
   self.importFrame.input:SetText(existing)
   self.importFrame.input:ClearFocus()
   if self.importFrame.inputScroll and self.importFrame.inputScroll.SetVerticalScroll then
@@ -666,6 +929,7 @@ function TC:ShowImportFrame()
   if self.importFrame.btnSetup then SetButtonEnabled(self.importFrame.btnSetup, hasInput) end
   if self.importFrame.btnKeywordInvite then SetAccentButtonEnabled(self.importFrame.btnKeywordInvite, hasValidInput) end
   if self.importFrame.btnSortRaid then SetAccentButtonEnabled(self.importFrame.btnSortRaid, canSort) end
+  self:UpdateImportSplitControls(existing)
   if self.setupFrame then self.setupFrame:Hide() end
   self.importFrame:Show()
   self.importFrame:Raise()
@@ -754,6 +1018,18 @@ function TC:CreateImportFrame()
   btnSetup:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -16, 16)
   btnSetup:SetText("3/3. Setup ->")
 
+  local btnSplitRaid = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+  btnSplitRaid:SetWidth(130); btnSplitRaid:SetHeight(24)
+  btnSplitRaid:SetPoint("BOTTOMLEFT", bg, "TOPLEFT", 0, 6)
+  btnSplitRaid:SetText("Split raid")
+  StyleAccentButton(btnSplitRaid)
+  SetAccentButtonEnabled(btnSplitRaid, false)
+
+  local splitDropDown = CreateFrame("Frame", "TacticaCompositionImportSplitDropDown", f, "UIDropDownMenuTemplate")
+  splitDropDown:SetPoint("LEFT", btnSplitRaid, "RIGHT", -10, -3)
+  UIDropDownMenu_SetWidth(230, splitDropDown)
+  splitDropDown:Hide()
+
   bg:EnableMouse(true)
   scroll:EnableMouse(true)
   scroll:EnableMouseWheel(true)
@@ -774,7 +1050,7 @@ function TC:CreateImportFrame()
   end)
 
   btnSetup:SetScript("OnClick", function()
-    if not ParseAndStoreCurrent(edit:GetText()) then return end
+    if not ParseAndStoreCurrent(edit:GetText(), self.pendingSplitConfig) then return end
     f:Hide()
     TC:OpenSetupStep()
   end)
@@ -784,8 +1060,12 @@ function TC:CreateImportFrame()
   end)
   btnSortRaid:SetScript("OnClick", function()
     if not HasValidCompositionText(edit:GetText()) then return end
-    if not ParseAndStoreCurrent(edit:GetText()) then return end
+    if not ParseAndStoreCurrent(edit:GetText(), self.pendingSplitConfig) then return end
     TC:SortRaidToSetupGroups()
+  end)
+  btnSplitRaid:SetScript("OnClick", function()
+    if not HasValidCompositionText(edit:GetText()) then return end
+    TC:ShowSplitRaidFrame()
   end)
   edit:SetScript("OnTextChanged", function()
     local lines = countLines(edit:GetText())
@@ -802,9 +1082,10 @@ function TC:CreateImportFrame()
     SetButtonEnabled(btnSetup, hasInput)
     SetAccentButtonEnabled(btnKeywordInvite, hasValidInput)
     SetAccentButtonEnabled(btnSortRaid, canSort)
+    TC:UpdateImportSplitControls(current)
   end)
   submit:SetScript("OnClick", function()
-    if not ParseAndStoreCurrent(edit:GetText()) then return end
+    if not ParseAndStoreCurrent(edit:GetText(), self.pendingSplitConfig) then return end
     f:Hide()
     TC:ShowCompositionFrame()
   end)
@@ -816,6 +1097,8 @@ function TC:CreateImportFrame()
   f.submit = submit
   f.btnKeywordInvite = btnKeywordInvite
   f.btnSortRaid = btnSortRaid
+  f.btnSplitRaid = btnSplitRaid
+  f.splitDropDown = splitDropDown
   self.importFrame = f
 end
 
@@ -834,8 +1117,9 @@ function TC:RefreshCompositionRows()
 
   local matchedLower = {}
 
-  for i=1, table.getn(data.slots) do
-    local slot = data.slots[i]
+  local activeSlots = GetActiveSlots(data)
+  for i=1, table.getn(activeSlots) do
+    local slot = activeSlots[i]
     local row = rows[i]
     if not row then
       row = CreateFrame("Frame", nil, f.content)
@@ -975,7 +1259,7 @@ function TC:RefreshCompositionRows()
   end
   table.sort(unmatched)
 
-  local last = rows[table.getn(data.slots)]
+  local last = rows[table.getn(activeSlots)]
   local anchor = last
 
   if not f.unmatchedTitle then
@@ -1009,7 +1293,7 @@ function TC:RefreshCompositionRows()
     prev = fs
   end
 
-  local rowsBottom = table.getn(data.slots) * 28 + 8
+  local rowsBottom = table.getn(activeSlots) * 28 + 8
   local unmatchedExtra = 24 + (table.getn(unmatched) * 16)
   f.content:SetHeight(math.max(1, rowsBottom + unmatchedExtra))
 end
@@ -1221,9 +1505,10 @@ function TC:RefreshSetupFrame()
     TacticaDB.Composition.setupOverrides = self.setupOverrides
   end
 
+  local activeSlots = GetActiveSlots(data)
   local i
-  for i=1,table.getn(data.slots) do
-    local slot = data.slots[i]
+  for i=1,table.getn(activeSlots) do
+    local slot = activeSlots[i]
     local g = tonumber(slot.groupNumber) or 0
     local sidx = tonumber(slot.slotNumber) or 0
     if g >= 1 and g <= 8 and sidx >= 1 and sidx <= 5 then
@@ -1594,6 +1879,7 @@ ev:SetScript("OnEvent", function()
     local inRaid = UnitInRaid and UnitInRaid("player") and true or false
     if _wasInRaid and (not inRaid) then
       TacticaDB.Composition.current = nil
+      TacticaDB.Composition.splitConfig = nil
       if TC.viewFrame then TC.viewFrame:Hide() end
       if TC.importFrame then TC.importFrame:Hide() end
       if TC.setupFrame then TC.setupFrame:Hide() end
