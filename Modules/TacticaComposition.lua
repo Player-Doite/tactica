@@ -774,12 +774,13 @@ function TC:UpdateImportSplitControls(rawText)
       local idx
       for idx=1,4 do
         if labels[idx] then
+          local selectedIdx = idx
           local info = UIDropDownMenu_CreateInfo()
           info.text = labels[idx]
           info.notCheckable = 1
           info.func = function()
-            self.pendingSplitConfig.activeRaid = idx
-            UIDropDownMenu_SetText(labels[idx], self.importFrame.splitDropDown)
+            self.pendingSplitConfig.activeRaid = selectedIdx
+            UIDropDownMenu_SetText(labels[selectedIdx], self.importFrame.splitDropDown)
           end
           UIDropDownMenu_AddButton(info)
         end
@@ -816,7 +817,7 @@ end
 
 function TC:CreateSplitRaidFrame()
   local f = CreateFrame("Frame", "TacticaCompositionSplitRaidFrame", UIParent)
-  f:SetWidth(380); f:SetHeight(270)
+  f:SetWidth(340); f:SetHeight(270)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   f:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=24, insets={left=8,right=8,top=8,bottom=8} })
   f:SetMovable(true); f:EnableMouse(true); f:SetToplevel(true); f:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -834,10 +835,7 @@ function TC:CreateSplitRaidFrame()
 
   local colFrom = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
   colFrom:SetPoint("TOPLEFT", f, "TOPLEFT", 116, -48)
-  colFrom:SetText("From Group")
-  local colTo = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  colTo:SetPoint("LEFT", colFrom, "RIGHT", 96, 0)
-  colTo:SetText("To Group")
+  colFrom:SetText("Select Groups")
 
   f.rows = {}
   local i
@@ -874,7 +872,7 @@ function TC:CreateSplitRaidFrame()
 
   local cancel = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   cancel:SetWidth(90); cancel:SetHeight(24)
-  cancel:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 84, 16)
+  cancel:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 64, 16)
   cancel:SetText("Cancel")
   cancel:SetScript("OnClick", function() f:Hide() end)
 
@@ -1019,7 +1017,7 @@ function TC:CreateImportFrame()
 
   local btnSplitRaid = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
   btnSplitRaid:SetWidth(130); btnSplitRaid:SetHeight(24)
-  btnSplitRaid:SetPoint("BOTTOMLEFT", bg, "TOPLEFT", 0, 6)
+  btnSplitRaid:SetPoint("BOTTOMLEFT", bg, "TOPLEFT", 0, 0)
   btnSplitRaid:SetText("Split raid")
   StyleAccentButton(btnSplitRaid)
   SetAccentButtonEnabled(btnSplitRaid, false)
