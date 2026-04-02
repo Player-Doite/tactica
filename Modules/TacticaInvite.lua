@@ -1497,7 +1497,7 @@ INV._evt:SetScript("OnEvent", function()
 
       INV._groupWarned = INV._groupWarned or {}
       if not INV._groupWarned[lname] then
-        if INV.enabled or INV.rbEnabled then
+        if INV_IsActive() then
           say(name, "[Tactica]: You are in group - please leave and write to me again.")
         end
         INV._groupWarned[lname] = true
