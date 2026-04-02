@@ -419,19 +419,25 @@ local TL_SlotsRemaining = nil
 local TL_WasInRaid = false
 local TL_AlreadyOnMsgShown = false
 local TL_KilledLootMobs = {}
+local TL_ActiveLootReq = nil
+local TL_OpenedLootMob = nil
+local TL_EmptiedLootMobs = {}
 
 local function ResetLootTrackingState()
   TL_SawLootWindow, TL_AwaitingLoot, TL_SlotsRemaining = false, false, nil
   TL_KilledLootMobs = {}
+  TL_ActiveLootReq = nil
+  TL_OpenedLootMob = nil
+  TL_EmptiedLootMobs = {}
 end
 
 local function MarkLootMobDeath(name)
-  if not name or name == "" then return false end
+  if not name or name == "" then return nil end
   BuildBossNameSet()
-  if not BossLootRequirements then return false end
+  if not BossLootRequirements then return nil end
 
   local deadKey = string.lower(name)
-  local shouldAwaitLoot = false
+  local completedBossKey = nil
 
   for bossKey, cfg in pairs(BossLootRequirements) do
     if cfg and cfg.req and cfg.req[deadKey] then
@@ -446,12 +452,12 @@ local function MarkLootMobDeath(name)
         end
       end
       if complete then
-        shouldAwaitLoot = true
+        completedBossKey = bossKey
       end
     end
   end
 
-  return shouldAwaitLoot
+  return completedBossKey
 end
 
 -- Core entry when boss is targeted (from Tactica.lua)
@@ -514,16 +520,26 @@ f:SetScript("OnEvent", function()
 
   elseif event == "CHAT_MSG_COMBAT_HOSTILE_DEATH" then
     local dead = string.match(arg1 or "", "^(.+) dies%.$")
-    if dead and MarkLootMobDeath(dead) then
+    local completedBossKey = dead and MarkLootMobDeath(dead) or nil
+    if completedBossKey then
       TL_AwaitingLoot   = true
       TL_SlotsRemaining = nil
       TL_SawLootWindow  = false
+      TL_OpenedLootMob  = nil
+      TL_EmptiedLootMobs = {}
+      local cfg = BossLootRequirements and BossLootRequirements[completedBossKey] or nil
+      TL_ActiveLootReq = cfg and cfg.req or nil
     end
 
   elseif event == "LOOT_OPENED" then
     if not TL_AwaitingLoot then return end
     TL_SawLootWindow = true
     TL_SlotsRemaining = CountRemainingLootSlots()
+    TL_OpenedLootMob = nil
+    local targetName = UnitName and UnitName("target") or nil
+    if targetName and TL_ActiveLootReq and TL_ActiveLootReq[string.lower(targetName)] then
+      TL_OpenedLootMob = string.lower(targetName)
+    end
 
   elseif event == "LOOT_SLOT_CLEARED" then
     if TL_SlotsRemaining and TL_SlotsRemaining > 0 then
@@ -532,14 +548,33 @@ f:SetScript("OnEvent", function()
 
   elseif event == "LOOT_CLOSED" then
     if not TL_AwaitingLoot then return end
-    TL_AwaitingLoot = false
     TL_SlotsRemaining = CountRemainingLootSlots()
 
     -- If I'm the ML, notify raid when corpse empties so RL can react
     local method = GetLootMethod and GetLootMethod()
     if method == "master" and TL_SawLootWindow and (TL_SlotsRemaining or 0) == 0 then
       if IsSelfMasterLooter() then
-        SendLootEmpty()
+        if TL_OpenedLootMob then
+          TL_EmptiedLootMobs[TL_OpenedLootMob] = true
+        end
+
+        local allEmptied = true
+        if TL_ActiveLootReq then
+          for reqName in pairs(TL_ActiveLootReq) do
+            if not TL_EmptiedLootMobs[reqName] then
+              allEmptied = false
+              break
+            end
+          end
+        end
+
+        if allEmptied then
+          SendLootEmpty()
+          TL_AwaitingLoot = false
+          TL_ActiveLootReq = nil
+          TL_OpenedLootMob = nil
+          TL_EmptiedLootMobs = {}
+        end
       end
     end
 
@@ -553,8 +588,9 @@ f:SetScript("OnEvent", function()
       return
     end
     if method ~= "master" then return end
+    if not IsSelfMasterLooter() then return end
     if not TL_SawLootWindow then return end
-    if (TL_SlotsRemaining or 0) == 0 then
+    if (TL_SlotsRemaining or 0) == 0 and not TL_AwaitingLoot then
       TacticaLoot_ShowPopup()
     end
 
