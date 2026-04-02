@@ -91,10 +91,9 @@ local function GetActiveSlots(data)
   local out = {}
   if not data or not data.slots then return out end
   local fromG, toG = GetActiveRaidRange(data)
-  local activeSlots = GetActiveSlots(data)
   local i
-  for i=1,table.getn(activeSlots) do
-    local slot = activeSlots[i]
+  for i=1,table.getn(data.slots) do
+    local slot = data.slots[i]
     local g = tonumber(slot.groupNumber) or 0
     local sidx = tonumber(slot.slotNumber) or 0
     if g >= fromG and g <= toG and sidx >= 1 and sidx <= 5 then
