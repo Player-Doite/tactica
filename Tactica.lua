@@ -976,6 +976,10 @@ function Tactica:StringsEqual(a, b)
     return a and b and string.lower(tostring(a)) == string.lower(tostring(b));
 end
 
+local function IsReservedBossField(name)
+    return name == "Loot table"
+end
+
 function Tactica:StandardizeName(name)
     if not name or name == "" then return "" end
     
@@ -1028,7 +1032,7 @@ function Tactica:StandardizeName(name)
                 return bossName
             end
             for tacticName in pairs(bosses[bossName]) do
-                if string.lower(tacticName) == lowerName then
+                if not IsReservedBossField(tacticName) and string.lower(tacticName) == lowerName then
                     return tacticName
                 end
             end
@@ -1115,7 +1119,7 @@ function Tactica:ListAvailableTactics()
                 if tactics and next(tactics) then
                     self:PrintMessage("  |cff00ffff"..bossName.."|r");
                     for tacticName in pairs(tactics) do
-                        if tacticName ~= "Default" then
+                        if tacticName ~= "Default" and not IsReservedBossField(tacticName) then
                             self:PrintMessage("    - "..tacticName);
                             count = count + 1;
                         end
@@ -2336,7 +2340,7 @@ function Tactica:UpdatePostTacticDropdown(raidName, bossName)
         -- Add tactics from default data
         if self.DefaultData[raidName] and self.DefaultData[raidName][bossName] then
             for tacticName in pairs(self.DefaultData[raidName][bossName]) do
-                if tacticName ~= "Default" then
+                if tacticName ~= "Default" and not IsReservedBossField(tacticName) then
                     local tacticName = tacticName
                     local info = {
                         text = tacticName,
@@ -2699,6 +2703,7 @@ Tactica.DefaultData = {
 			["Default"] = "Tanks: MT face away. Watch position of healers.\nDPS: Stay behind boss. Move out during Frenzy/Panic. Avoid fire patches. Max range.\nHealers: Heal spikes, prio MT. Cover Panic. Fearward tank.\nClass Specific: Hunters Tranq Frenzy. Priests Fear Ward tank. Shamans Tremor Totem.\nBoss Ability: Frenzy (tranq), Panic fear, fire patches."
 		},
 		["Smoldaris & Basalthar"] = {
+			["Loot table"] = { "Smoldaris", "Basalthar" },
 			["Default"] = "Tanks: 1 tank each. Smoldaris: FR gear, tank on spot face away (will do a fire-cone). Basalthar: watch knockback, tank against wall (entrence - towards same side as Smoldaris).\nDPS: Attack Smoldaris or Basalthar depending on Molten Bulwark buff on boss (start Basalthar). Avoid cone + AoE knockback. Swap between when called buff is up on bosses. Range stand where Basalthar is before pull.\nHealers: Heavy tank heals on Smoldaris. Heal repositioning after knockbacks. Smoldaris will do AoE - heal through. Stand with range where Smoldaris is before pull.\nClass Specific: FR pots useful. MDPS max melee range. Track Bulwark.\nBoss Ability: Smoldaris cone + AoE fire blasts. Basalthar knockback. Both will get buff Molten Bulwark (swap to other boss)."
 		},
 		["Garr"] = {
@@ -2750,6 +2755,9 @@ Tactica.DefaultData = {
         },
         ["Nefarian"] = {
             ["Default"] = "Tanks: 2-3 tanks needed. During P1, keep one tank each on each add entrence. When Nefarian lands MT picks up boss on the spot and faces boss towards balcony (tanks back). If \"Rogue call\", MT runs directly through and turns the boss until the call is over.\nDPS: Split DPS at the add doors to handle adds; never stand in front of the boss. Ranged stay ~40 yards away. Prioritize killing adds quickly when they spawn. Tanks AOE taunt / Limited Vulnerability Potion adds during phase 2 when they spawn.\nHealers: Stay distant (~40 yd) with ranged, out of Bellowing Roar range. Split up during inital add phase.\nClass Specific: All players (except MT) stay to right side of Neferian's facing direction. Mages/Druids decurse MT during P2. Priests/Shamans Fear Ward/Tremor Totems for MT.\nBoss Ability: If \"Mage Call\" - Mages needs to quickly LoS rest of raid, else all will get Polymorphed. If \"Priest Call\" stop casting direct heals, only HoT's. Rest of calls can be ignored/handled on spot."
+        },
+        ["Ezzel Darkbrewer"] = {
+            ["Default"] = "Tanks: Tank Ezzel in the center between pillars. Keep him faced away and centered so charge lanes are predictable.\nDPS: When targeted by charge, hide behind a pillar. Boss stuns on pillar hit and becomes vulnerable—burst then. Avoid standing in charge path.\nHealers: Pre-hot charge targets and path players. Top Acid Bomb targets, then move out from pools/DoT areas quickly.\nClass Specific: Mobility/sprint classes bait and break charge safely. Ranged call safe lanes so melee can step out fast.\nBoss Ability: Charges a player every ~10-20s; pillar stops it, stuns boss, and opens vuln window. Acid Bomb deals ~1200 hit plus ticking damage."
         }
     },
     ["Zul'Gurub"] = {
@@ -2821,6 +2829,7 @@ Tactica.DefaultData = {
             ["Default"] = "Tanks: Use 1–2 tanks and rotate when Acid Spit stacks (5+) begin to exceed healing capacity. Keep her facing away from melee. Equip Nature Resistance is recommended (depending on group).\nDPS: Damage boss as hard as possible, without breaking threat. Interrupt Frenzy with Tranquilizing Shot. Nature Resistance gear is recommended (depending on group).\nHealers: Spread to avoid multiple silences from Noxious Poison. Do not dispel Wyvern Sting unless called—doing so causes massive damage. Save at least 50% mana for her enrage phase.\nClass Specific: Hunters handle Tranquilizing Shot to remove Frenzy.  Barov Peasant Caller (trinket from quest) is highly recommended to be used and equiped by ALL players at ~40% health. This forces up towards 120 minions to soak the poison instead.\nBoss Ability: Huhuran applies Acid Spit stacking on tanks, Noxious Poison AoE on melee, and Berserker Enrage at 30%—use nature resistance and cooldowns to survive. Barov Peasant Caller quest trinket is highly recommended at ~40%."
         },
         ["Twin Emperors"] = {
+            ["Loot table"] = { "Emperor Vek'lor", "Emperor Vek'nilash" },
             ["Default"] = "Tanks: Assign one melee tank and one shadow-caster tank per emperor. Pull each to opposite sides (against wall) to avoid shared healing and split threat. Be ready to swap from melee to range tanking quickly after teleport, which grants threat to closest.\nDPS: Focus adds from Vek’nilash (bugs he spawns), then burn the emperor. Melee on Vek’nilash (and bugs during switch), casters handle bugs and shift to Vek’lor when adds are clear. Therefore DPS will run between the sides for their respective target.\nHealers: Position centrally for coverage; avoid Blizzard rays and exploding bugs from Vek’lor. Keep tanks topped through swaps and area transitions. Assign healers to tanks.\nBoss Ability: Two emperors share health; Vek’nilash auto-summons bugs and reduces tank defense, while Vek’lor casts Blizzard and Arcane Explosion zones—positioning is critical."
         },
         ["Ouro"] = {
@@ -2959,6 +2968,7 @@ Tactica.DefaultData = {
 			["Default"] = "Tanks: MT tanks boss facing away. 3 tanks pick up Infernal at every ~25%, move left, don't stack. Infernal reset threat, charge players—taunt back. Full Fire Resistance gear required for add tanking. If you get a Corruption of Medivh debuff, move away.\nDPS: Only DPS Medivh and Lingering Doom adds. Ignore Infernals. Assigned interrupts only—Shadebolt must be kicked. Overkicking/interruption causes instant casts. Move right if debuffed by Corruption of Medivh. Dodge Flamestrike. Range Spread behind boss.\nHealers: Assign 1 Priest + 1 Paladin to MT. Dispel Arcane Focus ASAP—causes +200% magic dmg. Shadebolt and Flamestrike deal heavy magic burst. Heal through Corruption of Medivh—never dispel it.\nClass Specific: Assign interrupters—Shadebolt is priority. Rogue/Warlock CoT/mind-numbing to increase cast. Priests/Paladins dispel MT's Arcane Focus. Move right if debuffed with Corruption of Medivh and use Restorative Pot at 4 stacks of Doom of Medivh!\nBoss Ability: Shadebolt = lethal, must be kicked. Overkicking = instant casts. Flamestrike targets group—move. Frost Nova roots melee. Corruption of Medivh is fatal if dispelled— Restorative Pot at 4 stacks Doom of Medivh."
 		},
 		["King (Chess)"] = {
+			["Loot table"] = { "King" },
 			["Default"] = "Tanks: 4-5 tanks. 1 tank picks up Rook (far left), 1 on Bishop (far right), 1 on Knight (close right), and 1-2 tanks also pick up Broken Rook, Decaying Bishop, Mechanical Knight and Pawns. Drag pawns to bosses for cleave. Swap Knight/Bishop tank at end.\nDPS: Kill order: Rook → Bishop → Knight → King. Swap to Pawns as they spawn and cleave them on bosses. LOS King's Holy Nova behind pillars after each boss dies or you will wipe. /bow on Queen's Dark Subservience if you get debuff. Avoid void zones.\nHealers: LOS King's Holy Nova behind pillars when any boss dies. Dispel silence from Bishop. Watch tank on Knight for armor debuff spikes. Prepare for AoE damage from Queen and Bishop. Keep range if not needed in melee.\nClass Specific: Mages/Druids decurse King's curse. All players must /bow in melee on Queen's Subservience or die. Stand behind Knight. LOS Holy Nova (King) when a boss dies. Interrupt/silence as needed. Dispel Bishop silence.\nBoss Ability: King- Holy Nova on each death, void zones, deadly curse. Queen- AoE Shadowbolts, Dark Subservience. Bishop- ST/cleave shadowbolt, silence. Knight- Frontal cleave, armor debuff. Pawns- constant spawn, cleave on boss."
 		},
 		["Sanv Tas'dal"] = {
@@ -2975,8 +2985,43 @@ Tactica.DefaultData = {
 		}
 	},
     ["Onyxia's Lair"] = {
+        ["Broodcommander Axelus"] = {
+            ["Default"] = "Tanks: MT keeps Axelus to the side (frontal push). Off tank/DPS tank big adds outside raid due to explosion.\nDPS: Break Chains by crossing boss line (or split left/right around boss). Swap hard to big adds; 2 alive is dangerous raid AoE.\nHealers: Expect burst on tank and add explosions. Keep tanks stable during add pickups and chain movement.\nClass Specific: Fast movers break chain lines quickly on one side each of boss. Assign stuns on big adds while they are moved out.\nBoss Ability: Chain cast (Searing Pain-like icon) links 2 players; line through boss breaks it. At 5% he resets to 100% (half Onyxia HP), then repeat cleanly."
+        },
         ["Onyxia"] = {
             ["Default"] = "Tanks: Tank near back wall during inital phase (P1) and when Onyxia lands again (P3). Turn away from raid (side of boss towards raid). During airphase (P2), grab all adds.\nDPS: Never stand behind or infront of Onyxia. Focus adds when up. CARE THREAT! Stable DPS and let tank get agro when Onyxia lands (P3).\nHealers: Focus on tank, and during airphase (P2) and landing phase (P3) on damage on raid.\nClass Specific: Fear Ward (Priests) and Tremor Totem (Shaman) prio for MT during landing phase (P3).\nBoss Ability: During airphase (P2) Onyxia will occasionally Fire Breath, with will likely kill anyone in it's path. To avoid it ALL must NEVER stand beneath or diagonally (in straight line) from where Onyxia currently is facing. Note the boss will move."
+        }
+    },
+    ["Timbermaw Hold"] = {
+        ["Karrsh the Sentinel"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Rotgrowl"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Loktanag the Vile"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Trioch the Devourer"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Selenaxx Foulheart"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Ormanos the Cracked"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Chieftain Partath"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Archdruid Kronn"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Ursol"] = {
+            ["Default"] = "No tactic added yet."
+        },
+        ["Peroth'arn"] = {
+            ["Default"] = "No tactic added yet."
         }
     }
 }

@@ -53,13 +53,43 @@ end
 -- Boss detection (worldboss OR name from DefaultData)
 -------------------------------------------------
 local BossNameSet
+local BossLootRequirements
+
 local function BuildBossNameSet()
-  if BossNameSet then return end
+  if BossNameSet and BossLootRequirements then return end
   BossNameSet = {}
+  BossLootRequirements = {}
+
   if Tactica and Tactica.DefaultData then
     for raidName, bosses in pairs(Tactica.DefaultData) do
-      for bossName in pairs(bosses) do
-        BossNameSet[string.lower(bossName)] = true
+      for bossName, bossData in pairs(bosses) do
+        local bossKey = string.lower(bossName)
+        BossNameSet[bossKey] = true
+
+        local reqSet = {}
+        local reqCount = 0
+        local lootTable = type(bossData) == "table" and bossData["Loot table"] or nil
+
+        if type(lootTable) == "table" then
+          for i=1, tlen(lootTable) do
+            local mobName = lootTable[i]
+            if mobName and mobName ~= "" then
+              local mobKey = string.lower(mobName)
+              if not reqSet[mobKey] then
+                reqSet[mobKey] = true
+                reqCount = reqCount + 1
+              end
+              BossNameSet[mobKey] = true
+            end
+          end
+        end
+
+        if reqCount == 0 then
+          reqSet[bossKey] = true
+          reqCount = 1
+        end
+
+        BossLootRequirements[bossKey] = { req = reqSet, count = reqCount }
       end
     end
   end
@@ -388,13 +418,48 @@ local TL_AwaitingLoot  = false
 local TL_SlotsRemaining = nil
 local TL_WasInRaid = false
 local TL_AlreadyOnMsgShown = false
+local TL_KilledLootMobs = {}
+
+local function ResetLootTrackingState()
+  TL_SawLootWindow, TL_AwaitingLoot, TL_SlotsRemaining = false, false, nil
+  TL_KilledLootMobs = {}
+end
+
+local function MarkLootMobDeath(name)
+  if not name or name == "" then return false end
+  BuildBossNameSet()
+  if not BossLootRequirements then return false end
+
+  local deadKey = string.lower(name)
+  local shouldAwaitLoot = false
+
+  for bossKey, cfg in pairs(BossLootRequirements) do
+    if cfg and cfg.req and cfg.req[deadKey] then
+      TL_KilledLootMobs[bossKey] = TL_KilledLootMobs[bossKey] or {}
+      TL_KilledLootMobs[bossKey][deadKey] = true
+
+      local complete = true
+      for reqName in pairs(cfg.req) do
+        if not TL_KilledLootMobs[bossKey][reqName] then
+          complete = false
+          break
+        end
+      end
+      if complete then
+        shouldAwaitLoot = true
+      end
+    end
+  end
+
+  return shouldAwaitLoot
+end
 
 -- Core entry when boss is targeted (from Tactica.lua)
-function TacticaLoot_OnBossTargeted()
+function TacticaLoot_OnBossTargeted(raidName, bossName)
   EnsureLootDefaults()
   if not (InRaid() and IsRL()) then return end
   if not (TacticaDB.Settings and TacticaDB.Settings.Loot and TacticaDB.Settings.Loot.AutoMasterLoot) then return end
-  if not IsBossTarget() then return end
+  if not ((bossName and bossName ~= "") or IsBossTarget()) then return end
 
   local method = GetLootMethod and GetLootMethod()
   if method ~= "master" then
@@ -430,13 +495,14 @@ f:SetScript("OnEvent", function()
 
   if event == "PLAYER_ENTERING_WORLD" then
     TL_WasInRaid = InRaid() and true or false
+    if not TL_WasInRaid then ResetLootTrackingState() end
 
   elseif event == "RAID_ROSTER_UPDATE" then
     local now = InRaid() and true or false
     if TL_WasInRaid and not now then
       -- Left raid: clear raid-scoped skip
       LootSkip_Clear()
-      TL_SawLootWindow, TL_AwaitingLoot, TL_SlotsRemaining = false, false, nil
+      ResetLootTrackingState()
     elseif now then
       -- still in raid: if RL changed, clear skip
       local leader = GetRaidLeaderName()
@@ -448,13 +514,10 @@ f:SetScript("OnEvent", function()
 
   elseif event == "CHAT_MSG_COMBAT_HOSTILE_DEATH" then
     local dead = string.match(arg1 or "", "^(.+) dies%.$")
-    if dead then
-      BuildBossNameSet()
-      if BossNameSet and BossNameSet[string.lower(dead)] then
-        TL_AwaitingLoot   = true
-        TL_SlotsRemaining = nil
-        TL_SawLootWindow  = false
-      end
+    if dead and MarkLootMobDeath(dead) then
+      TL_AwaitingLoot   = true
+      TL_SlotsRemaining = nil
+      TL_SawLootWindow  = false
     end
 
   elseif event == "LOOT_OPENED" then
