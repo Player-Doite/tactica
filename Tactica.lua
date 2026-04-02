@@ -200,6 +200,7 @@ Tactica.Aliases = {
     ["naxx"] = "Naxxramas",
     ["kara10"] = "Lower Karazhan Halls",
     ["kara40"] = "Upper Karazhan Halls",
+    ["th"] = "Timbermaw Hold",
     ["world"] = "World Bosses",
 
     -- Bosses
@@ -238,6 +239,17 @@ Tactica.Aliases = {
 	["incantagos"] = "Lay-Watcher Incantagos",
 	["gnarlmoon"] = "Keeper Gnarlmoon",
 	["solnius"] = "Solnius the Awakener",
+    ["loktanag "] = "Loktanag the Vile",
+    ["loktanag"] = "Loktanag the Vile",
+    ["karrsh"] = "Karrsh the Sentinel",
+    ["trioch"] = "Trioch the Devourer",
+    ["selenaxx "] = "Selenaxx Foulheart",
+    ["selenaxx"] = "Selenaxx Foulheart",
+    ["ormanos "] = "Ormanos the Cracked",
+    ["ormanos"] = "Ormanos the Cracked",
+    ["chieftain"] = "Chieftain Partath",
+    ["kronn"] = "Archdruid Kronn",
+    ["axelus"] = "Broodcommander Axelus",
 }
 
 if not UIDropDownMenu_CreateInfo then
@@ -1672,7 +1684,7 @@ function Tactica:CreateAddFrame()
                 "Molten Core", "Blackwing Lair", "Zul'Gurub",
                 "Ruins of Ahn'Qiraj", "Temple of Ahn'Qiraj",
                 "Onyxia's Lair", "Emerald Sanctum", "Naxxramas",
-                "Lower Karazhan Halls", "Upper Karazhan Halls", "World Bosses"
+                "Lower Karazhan Halls", "Upper Karazhan Halls", "Timbermaw Hold", "World Bosses"
             }
             for _, raidName in ipairs(raids) do
                 local raidName = raidName
@@ -1991,7 +2003,7 @@ function Tactica:CreatePostFrame()
                 "Molten Core", "Blackwing Lair", "Zul'Gurub",
                 "Ruins of Ahn'Qiraj", "Temple of Ahn'Qiraj",
                 "Onyxia's Lair", "Emerald Sanctum", "Naxxramas",
-                "Lower Karazhan Halls", "Upper Karazhan Halls", "World Bosses"
+                "Lower Karazhan Halls", "Upper Karazhan Halls", "Timbermaw Hold", "World Bosses"
             }
             for _, raidName in ipairs(raids) do
                 local r = raidName
