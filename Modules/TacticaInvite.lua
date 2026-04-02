@@ -134,11 +134,17 @@ local function RBFrameShown()
   return (R and R.frame and R.frame:IsShown()) and true or false
 end
 
+local function InviteFrameShown()
+  return (TacticaInviteFrame and TacticaInviteFrame:IsShown()) and true or false
+end
+
 -- Module should ONLY do anything when:
 --  - standalone keyword autoinvite is enabled, OR
+--  - standalone invite frame is currently shown, OR
 --  - raid builder frame is currently shown (and RB features are enabled)
 local function INV_IsActive()
   if INV.enabled then return true end
+  if InviteFrameShown() then return true end
   if RBFrameShown() and (INV.rbEnabled or INV.rbAutoRoles or (INV.rbGearEnabled and INV.rbGearThreshold ~= nil)) then
     return true
   end
@@ -1497,7 +1503,7 @@ INV._evt:SetScript("OnEvent", function()
 
       INV._groupWarned = INV._groupWarned or {}
       if not INV._groupWarned[lname] then
-        if INV.enabled or INV.rbEnabled then
+        if INV_IsActive() then
           say(name, "[Tactica]: You are in group - please leave and write to me again.")
         end
         INV._groupWarned[lname] = true

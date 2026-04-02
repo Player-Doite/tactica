@@ -817,7 +817,7 @@ end
 
 function TC:CreateSplitRaidFrame()
   local f = CreateFrame("Frame", "TacticaCompositionSplitRaidFrame", UIParent)
-  f:SetWidth(340); f:SetHeight(270)
+  f:SetWidth(340); f:SetHeight(240)
   f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
   f:SetBackdrop({ bgFile="Interface\\DialogFrame\\UI-DialogBox-Background", edgeFile="Interface\\DialogFrame\\UI-DialogBox-Border", tile=true, tileSize=32, edgeSize=24, insets={left=8,right=8,top=8,bottom=8} })
   f:SetMovable(true); f:EnableMouse(true); f:SetToplevel(true); f:SetFrameStrata("FULLSCREEN_DIALOG")
