@@ -556,6 +556,19 @@ f:SetScript("OnEvent", function()
       if IsSelfMasterLooter() then
         if TL_OpenedLootMob then
           TL_EmptiedLootMobs[TL_OpenedLootMob] = true
+        elseif TL_ActiveLootReq then
+          -- Fallback: if exactly one required loot mob, allow empty close to satisfy it
+          -- even when target name wasn't available at LOOT_OPENED.
+          local onlyReq = nil
+          local reqCount = 0
+          for reqName in pairs(TL_ActiveLootReq) do
+            onlyReq = reqName
+            reqCount = reqCount + 1
+            if reqCount > 1 then break end
+          end
+          if reqCount == 1 and onlyReq then
+            TL_EmptiedLootMobs[onlyReq] = true
+          end
         end
 
         local allEmptied = true
