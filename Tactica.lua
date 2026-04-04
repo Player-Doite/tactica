@@ -325,6 +325,11 @@ Tactica:RegisterBossAliases("Upper Karazhan Halls", "King (Chess)", {
   "King","Rook","Bishop","Knight","Decaying Bishop","Malfunctioning Knight","Broken Rook","Withering Pawn",
 }, "hostile")
 
+-- Timbermaw: Kodiak add should count as Rotgrowl encounter target
+Tactica:RegisterBossAliases("Timbermaw Hold", "Rotgrowl", {
+  "Kodiak",
+}, "hostile")
+
 -- ES: Solnius before spoken to → Solnius hostile (later the dragon Solnius the Awakener)
 Tactica:RegisterBossAliases("Emerald Sanctum", "Solnius the Awakener", {
   "Solnius",
@@ -3006,31 +3011,31 @@ Tactica.DefaultData = {
     },
     ["Timbermaw Hold"] = {
         ["Karrsh the Sentinel"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: Face Karrsh away (cleave). 2nd tank ready for aggro reset. In P1, at ~70% Slam cast, MT can LoS behind pillar to skip reset. Pick adds instantly.\nDPS: Kill spawned adds instantly. Stay out of frontal. During P1 Slam timing, help execute LoS skip cleanly.\nHealers: Never dispel Seed in raid (explodes). Track spikes after resets and during add pressure.\nClass Specific: Assigned dispeller handles Seed only outside stack/raid if needed.\nBoss Ability: Seed explodes on dispel, cleave, and threat resets. P1 Slam reset can be LoS-skipped; later phases are direct resets."
         },
         ["Rotgrowl"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: Keep Rotgrowl faced away and stable while Kodiak is controlled/killed.\nDPS: Kill Kodiak (bear add) fast; boss becomes vulnerable after bear dies. Move out of arrow AoE.\nHealers: Prepare for damage on fixate target and fear moments; keep movement-safe healing.\nClass Specific: Mobility classes kite safely if chased by Kodiak.\nBoss Ability: Kodiak fixates/chases with fear moments; arrow AoE requires movement. Flaming Bolt targets a random player."
         },
         ["Loktanag the Vile"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: MT moves boss with raid in a hexagon path while keeping boss out of cloud drops.\nDPS: Everyone stacks so clouds drop in one controlled spot; no player outside stack. Kill spawned adds fast while moving with tank.\nHealers: Heavy dispel/decurse/cure priority while raid stays stacked and moving.\nClass Specific: Shamans keep Poison Cleansing Totem coverage.\nBoss Ability: Poison clouds target random players; controlled stacking keeps room usable. Add spawns overlap cloud movement."
         },
         ["Trioch the Devourer"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: Keep Trioch faced away; tank stacks are expected while holding frontal.\nDPS: Never stand in front and avoid frontal stack debuffs. Move out of poison clouds and kill adds.\nHealers: Each stack increases tank vulnerability; prepare escalating tank damage.\nClass Specific: Cleanse support where class toolkit allows.\nBoss Ability: Three heads (frost/fire/poison) apply stacking frontals. Follow on-screen instructions whenever Trioch conducts an ability."
         },
         ["Selenaxx Foulheart"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: Gain threat by standing in line between boss and crystal. Swap tanks at 85/65/45/25% for heavy post-threshold mechanics.\nDPS: Kill adds on spawn and interrupt immediately.\nHealers: Track shadow-vulnerability tank debuff and swap spikes.\nClass Specific: Assign one player to stay furthest for Rain of Destruction bait.\nBoss Ability: If boss is closest to crystal he gains stacks (12 = wipe). Rain of Destruction hits the furthest target; move out of fire."
         },
         ["Ormanos the Cracked"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: Keep boss away from clones. Hold boss steady while Tremor of Ormanos spawns are handled.\nDPS: Kill Tremor clones fast or they spawn extra adds and AoE pressure.\nHealers: Be ready for heavy spike healing during clone AoE around melee.\nClass Specific: Curse of Tongues on boss to slow charge casts.\nBoss Ability: During charge, EVERYONE stacks on the assigned marker to split damage correctly. Boss gains rotating spell-school vulnerability windows."
         },
         ["Chieftain Partath"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: Keep boss and illuminators on separate sides. During boss immunity, move illuminators above boss.\nDPS: Kill spawned adds (not illuminators). Interrupt illuminator Regrowth; otherwise nuke boss.\nHealers: Prepare burst healing during movement windows and Leeching Strike cast.\nClass Specific: Assign strict interrupt rotation on illuminators.\nBoss Ability: Leeching Strike turns boss toward raid path and starts casting; melee must sidestep then return."
         },
         ["Archdruid Kronn"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: Outside group handles hostile boss. Two groups swap every ~30s by Phasebound timer.\nDPS: Outside: kill boss + Xavian Image only. Inside: kill image/adds before they reach portal.\nHealers: Inside heal friendly boss to ~90%, then sync 100% inside with 0% outside within ~10s.\nClass Specific: Druids are preferred inside healers (no inside damage taken).\nBoss Ability: Dual-world sync fight: dispel/decurse/cure everything, rotate in/out on debuff timing, and finish both realms simultaneously."
         },
         ["Ursol"] = {
-            ["Default"] = "No tactic added yet."
+            ["Default"] = "Tanks: Armor is ignored, so prioritize high-HP setup and stable positioning.\nDPS: If chased by fiends, kite. Assign fiend-killers while rest stay boss. At 30% all kill adds, then boss (optional LIP nuking adds after banish phase).\nHealers: If chased by fiends, kite and call path. Cover fear phases, add pressure, and post-30% add burst.\nClass Specific: Decurse Mind-Shattering Rumble.\nBoss Ability: Fear and root zones occur. Fiends spawn; if fixated, run. Immune/banish phase transitions into add cleanup, then boss kill window."
         },
         ["Peroth'arn"] = {
             ["Default"] = "No tactic added yet."
