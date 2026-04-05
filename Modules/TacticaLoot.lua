@@ -153,11 +153,23 @@ end
 local function CountRemainingLootSlots()
   local n = GetNumLootItems and GetNumLootItems() or 0
   if n <= 0 then return 0 end
+  if not LootSlotHasItem then return n end
+
   local remaining = 0
   for i=1, n do
-    if LootSlotHasItem and LootSlotHasItem(i) then
+    local hasItem = LootSlotHasItem(i) and true or false
+    if (not hasItem) and GetLootSlotInfo then
+      local texture = GetLootSlotInfo(i)
+      if texture then hasItem = true end
+    end
+    if hasItem then
       remaining = remaining + 1
     end
+  end
+  if remaining == 0 then
+    -- Some clients under Master Loot can report no per-slot item flags even
+    -- while loot exists; fall back to slot count captured from GetNumLootItems.
+    return n
   end
   return remaining
 end
