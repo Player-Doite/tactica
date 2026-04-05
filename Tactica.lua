@@ -200,6 +200,7 @@ Tactica.Aliases = {
     ["naxx"] = "Naxxramas",
     ["kara10"] = "Lower Karazhan Halls",
     ["kara40"] = "Upper Karazhan Halls",
+    ["th"] = "Timbermaw Hold",
     ["world"] = "World Bosses",
 
     -- Bosses
@@ -238,6 +239,17 @@ Tactica.Aliases = {
 	["incantagos"] = "Lay-Watcher Incantagos",
 	["gnarlmoon"] = "Keeper Gnarlmoon",
 	["solnius"] = "Solnius the Awakener",
+    ["loktanag "] = "Loktanag the Vile",
+    ["loktanag"] = "Loktanag the Vile",
+    ["karrsh"] = "Karrsh the Sentinel",
+    ["trioch"] = "Trioch the Devourer",
+    ["selenaxx "] = "Selenaxx Foulheart",
+    ["selenaxx"] = "Selenaxx Foulheart",
+    ["ormanos "] = "Ormanos the Cracked",
+    ["ormanos"] = "Ormanos the Cracked",
+    ["chieftain"] = "Chieftain Partath",
+    ["kronn"] = "Archdruid Kronn",
+    ["axelus"] = "Broodcommander Axelus",
 }
 
 if not UIDropDownMenu_CreateInfo then
@@ -311,6 +323,11 @@ Tactica:RegisterBossAliases("Naxxramas", "The Four Horsemen", {
 -- Kara40: Any key piece should count → King (Chess) (they’re hostile; “any” is also fine)
 Tactica:RegisterBossAliases("Upper Karazhan Halls", "King (Chess)", {
   "King","Rook","Bishop","Knight","Decaying Bishop","Malfunctioning Knight","Broken Rook","Withering Pawn",
+}, "hostile")
+
+-- Timbermaw: Kodiak add should count as Rotgrowl encounter target
+Tactica:RegisterBossAliases("Timbermaw Hold", "Rotgrowl", {
+  "Kodiak",
 }, "hostile")
 
 -- ES: Solnius before spoken to → Solnius hostile (later the dragon Solnius the Awakener)
@@ -976,6 +993,10 @@ function Tactica:StringsEqual(a, b)
     return a and b and string.lower(tostring(a)) == string.lower(tostring(b));
 end
 
+local function IsReservedBossField(name)
+    return name == "Loot table"
+end
+
 function Tactica:StandardizeName(name)
     if not name or name == "" then return "" end
     
@@ -1028,7 +1049,7 @@ function Tactica:StandardizeName(name)
                 return bossName
             end
             for tacticName in pairs(bosses[bossName]) do
-                if string.lower(tacticName) == lowerName then
+                if not IsReservedBossField(tacticName) and string.lower(tacticName) == lowerName then
                     return tacticName
                 end
             end
@@ -1115,7 +1136,7 @@ function Tactica:ListAvailableTactics()
                 if tactics and next(tactics) then
                     self:PrintMessage("  |cff00ffff"..bossName.."|r");
                     for tacticName in pairs(tactics) do
-                        if tacticName ~= "Default" then
+                        if tacticName ~= "Default" and not IsReservedBossField(tacticName) then
                             self:PrintMessage("    - "..tacticName);
                             count = count + 1;
                         end
@@ -1668,7 +1689,7 @@ function Tactica:CreateAddFrame()
                 "Molten Core", "Blackwing Lair", "Zul'Gurub",
                 "Ruins of Ahn'Qiraj", "Temple of Ahn'Qiraj",
                 "Onyxia's Lair", "Emerald Sanctum", "Naxxramas",
-                "Lower Karazhan Halls", "Upper Karazhan Halls", "World Bosses"
+                "Lower Karazhan Halls", "Upper Karazhan Halls", "Timbermaw Hold", "World Bosses"
             }
             for _, raidName in ipairs(raids) do
                 local raidName = raidName
@@ -1987,7 +2008,7 @@ function Tactica:CreatePostFrame()
                 "Molten Core", "Blackwing Lair", "Zul'Gurub",
                 "Ruins of Ahn'Qiraj", "Temple of Ahn'Qiraj",
                 "Onyxia's Lair", "Emerald Sanctum", "Naxxramas",
-                "Lower Karazhan Halls", "Upper Karazhan Halls", "World Bosses"
+                "Lower Karazhan Halls", "Upper Karazhan Halls", "Timbermaw Hold", "World Bosses"
             }
             for _, raidName in ipairs(raids) do
                 local r = raidName
@@ -2336,7 +2357,7 @@ function Tactica:UpdatePostTacticDropdown(raidName, bossName)
         -- Add tactics from default data
         if self.DefaultData[raidName] and self.DefaultData[raidName][bossName] then
             for tacticName in pairs(self.DefaultData[raidName][bossName]) do
-                if tacticName ~= "Default" then
+                if tacticName ~= "Default" and not IsReservedBossField(tacticName) then
                     local tacticName = tacticName
                     local info = {
                         text = tacticName,
@@ -2699,6 +2720,7 @@ Tactica.DefaultData = {
 			["Default"] = "Tanks: MT face away. Watch position of healers.\nDPS: Stay behind boss. Move out during Frenzy/Panic. Avoid fire patches. Max range.\nHealers: Heal spikes, prio MT. Cover Panic. Fearward tank.\nClass Specific: Hunters Tranq Frenzy. Priests Fear Ward tank. Shamans Tremor Totem.\nBoss Ability: Frenzy (tranq), Panic fear, fire patches."
 		},
 		["Smoldaris & Basalthar"] = {
+			["Loot table"] = { "Smoldaris", "Basalthar" },
 			["Default"] = "Tanks: 1 tank each. Smoldaris: FR gear, tank on spot face away (will do a fire-cone). Basalthar: watch knockback, tank against wall (entrence - towards same side as Smoldaris).\nDPS: Attack Smoldaris or Basalthar depending on Molten Bulwark buff on boss (start Basalthar). Avoid cone + AoE knockback. Swap between when called buff is up on bosses. Range stand where Basalthar is before pull.\nHealers: Heavy tank heals on Smoldaris. Heal repositioning after knockbacks. Smoldaris will do AoE - heal through. Stand with range where Smoldaris is before pull.\nClass Specific: FR pots useful. MDPS max melee range. Track Bulwark.\nBoss Ability: Smoldaris cone + AoE fire blasts. Basalthar knockback. Both will get buff Molten Bulwark (swap to other boss)."
 		},
 		["Garr"] = {
@@ -2750,6 +2772,9 @@ Tactica.DefaultData = {
         },
         ["Nefarian"] = {
             ["Default"] = "Tanks: 2-3 tanks needed. During P1, keep one tank each on each add entrence. When Nefarian lands MT picks up boss on the spot and faces boss towards balcony (tanks back). If \"Rogue call\", MT runs directly through and turns the boss until the call is over.\nDPS: Split DPS at the add doors to handle adds; never stand in front of the boss. Ranged stay ~40 yards away. Prioritize killing adds quickly when they spawn. Tanks AOE taunt / Limited Vulnerability Potion adds during phase 2 when they spawn.\nHealers: Stay distant (~40 yd) with ranged, out of Bellowing Roar range. Split up during inital add phase.\nClass Specific: All players (except MT) stay to right side of Neferian's facing direction. Mages/Druids decurse MT during P2. Priests/Shamans Fear Ward/Tremor Totems for MT.\nBoss Ability: If \"Mage Call\" - Mages needs to quickly LoS rest of raid, else all will get Polymorphed. If \"Priest Call\" stop casting direct heals, only HoT's. Rest of calls can be ignored/handled on spot."
+        },
+        ["Ezzel Darkbrewer"] = {
+            ["Default"] = "Tanks: Tank Ezzel in the center between pillars. Keep him faced away and centered so charge lanes are predictable.\nDPS: When targeted by charge, hide behind a pillar. Boss stuns on pillar hit and becomes vulnerable—burst then. Avoid standing in charge path.\nHealers: Pre-hot charge targets and path players. Top Acid Bomb targets, then move out from pools/DoT areas quickly.\nClass Specific: Mobility/sprint classes bait and break charge safely. Ranged call safe lanes so melee can step out fast.\nBoss Ability: Charges a player every ~10-20s; pillar stops it, stuns boss, and opens vuln window. Acid Bomb deals ~1200 hit plus ticking damage."
         }
     },
     ["Zul'Gurub"] = {
@@ -2821,6 +2846,7 @@ Tactica.DefaultData = {
             ["Default"] = "Tanks: Use 1–2 tanks and rotate when Acid Spit stacks (5+) begin to exceed healing capacity. Keep her facing away from melee. Equip Nature Resistance is recommended (depending on group).\nDPS: Damage boss as hard as possible, without breaking threat. Interrupt Frenzy with Tranquilizing Shot. Nature Resistance gear is recommended (depending on group).\nHealers: Spread to avoid multiple silences from Noxious Poison. Do not dispel Wyvern Sting unless called—doing so causes massive damage. Save at least 50% mana for her enrage phase.\nClass Specific: Hunters handle Tranquilizing Shot to remove Frenzy.  Barov Peasant Caller (trinket from quest) is highly recommended to be used and equiped by ALL players at ~40% health. This forces up towards 120 minions to soak the poison instead.\nBoss Ability: Huhuran applies Acid Spit stacking on tanks, Noxious Poison AoE on melee, and Berserker Enrage at 30%—use nature resistance and cooldowns to survive. Barov Peasant Caller quest trinket is highly recommended at ~40%."
         },
         ["Twin Emperors"] = {
+            ["Loot table"] = { "Emperor Vek'lor", "Emperor Vek'nilash" },
             ["Default"] = "Tanks: Assign one melee tank and one shadow-caster tank per emperor. Pull each to opposite sides (against wall) to avoid shared healing and split threat. Be ready to swap from melee to range tanking quickly after teleport, which grants threat to closest.\nDPS: Focus adds from Vek’nilash (bugs he spawns), then burn the emperor. Melee on Vek’nilash (and bugs during switch), casters handle bugs and shift to Vek’lor when adds are clear. Therefore DPS will run between the sides for their respective target.\nHealers: Position centrally for coverage; avoid Blizzard rays and exploding bugs from Vek’lor. Keep tanks topped through swaps and area transitions. Assign healers to tanks.\nBoss Ability: Two emperors share health; Vek’nilash auto-summons bugs and reduces tank defense, while Vek’lor casts Blizzard and Arcane Explosion zones—positioning is critical."
         },
         ["Ouro"] = {
@@ -2959,6 +2985,7 @@ Tactica.DefaultData = {
 			["Default"] = "Tanks: MT tanks boss facing away. 3 tanks pick up Infernal at every ~25%, move left, don't stack. Infernal reset threat, charge players—taunt back. Full Fire Resistance gear required for add tanking. If you get a Corruption of Medivh debuff, move away.\nDPS: Only DPS Medivh and Lingering Doom adds. Ignore Infernals. Assigned interrupts only—Shadebolt must be kicked. Overkicking/interruption causes instant casts. Move right if debuffed by Corruption of Medivh. Dodge Flamestrike. Range Spread behind boss.\nHealers: Assign 1 Priest + 1 Paladin to MT. Dispel Arcane Focus ASAP—causes +200% magic dmg. Shadebolt and Flamestrike deal heavy magic burst. Heal through Corruption of Medivh—never dispel it.\nClass Specific: Assign interrupters—Shadebolt is priority. Rogue/Warlock CoT/mind-numbing to increase cast. Priests/Paladins dispel MT's Arcane Focus. Move right if debuffed with Corruption of Medivh and use Restorative Pot at 4 stacks of Doom of Medivh!\nBoss Ability: Shadebolt = lethal, must be kicked. Overkicking = instant casts. Flamestrike targets group—move. Frost Nova roots melee. Corruption of Medivh is fatal if dispelled— Restorative Pot at 4 stacks Doom of Medivh."
 		},
 		["King (Chess)"] = {
+			["Loot table"] = { "King" },
 			["Default"] = "Tanks: 4-5 tanks. 1 tank picks up Rook (far left), 1 on Bishop (far right), 1 on Knight (close right), and 1-2 tanks also pick up Broken Rook, Decaying Bishop, Mechanical Knight and Pawns. Drag pawns to bosses for cleave. Swap Knight/Bishop tank at end.\nDPS: Kill order: Rook → Bishop → Knight → King. Swap to Pawns as they spawn and cleave them on bosses. LOS King's Holy Nova behind pillars after each boss dies or you will wipe. /bow on Queen's Dark Subservience if you get debuff. Avoid void zones.\nHealers: LOS King's Holy Nova behind pillars when any boss dies. Dispel silence from Bishop. Watch tank on Knight for armor debuff spikes. Prepare for AoE damage from Queen and Bishop. Keep range if not needed in melee.\nClass Specific: Mages/Druids decurse King's curse. All players must /bow in melee on Queen's Subservience or die. Stand behind Knight. LOS Holy Nova (King) when a boss dies. Interrupt/silence as needed. Dispel Bishop silence.\nBoss Ability: King- Holy Nova on each death, void zones, deadly curse. Queen- AoE Shadowbolts, Dark Subservience. Bishop- ST/cleave shadowbolt, silence. Knight- Frontal cleave, armor debuff. Pawns- constant spawn, cleave on boss."
 		},
 		["Sanv Tas'dal"] = {
@@ -2975,8 +3002,43 @@ Tactica.DefaultData = {
 		}
 	},
     ["Onyxia's Lair"] = {
+        ["Broodcommander Axelus"] = {
+            ["Default"] = "Tanks: MT keeps Axelus to the side (frontal push). Off tank/DPS tank big adds outside raid due to explosion.\nDPS: Break Chains by crossing boss line (or split left/right around boss). Swap hard to big adds; 2 alive is dangerous raid AoE.\nHealers: Expect burst on tank and add explosions. Keep tanks stable during add pickups and chain movement.\nClass Specific: Fast movers break chain lines quickly on one side each of boss. Assign stuns on big adds while they are moved out.\nBoss Ability: Chain cast (Searing Pain-like icon) links 2 players; line through boss breaks it. At 5% he resets to 100% (half Onyxia HP), then repeat cleanly."
+        },
         ["Onyxia"] = {
             ["Default"] = "Tanks: Tank near back wall during inital phase (P1) and when Onyxia lands again (P3). Turn away from raid (side of boss towards raid). During airphase (P2), grab all adds.\nDPS: Never stand behind or infront of Onyxia. Focus adds when up. CARE THREAT! Stable DPS and let tank get agro when Onyxia lands (P3).\nHealers: Focus on tank, and during airphase (P2) and landing phase (P3) on damage on raid.\nClass Specific: Fear Ward (Priests) and Tremor Totem (Shaman) prio for MT during landing phase (P3).\nBoss Ability: During airphase (P2) Onyxia will occasionally Fire Breath, with will likely kill anyone in it's path. To avoid it ALL must NEVER stand beneath or diagonally (in straight line) from where Onyxia currently is facing. Note the boss will move."
+        }
+    },
+    ["Timbermaw Hold"] = {
+        ["Karrsh the Sentinel"] = {
+            ["Default"] = "Tanks: Face Karrsh away (cleave). 2nd tank ready for aggro reset. In P1, at ~70% Slam cast, MT can LoS behind pillar to skip reset. Pick adds instantly.\nDPS: Kill spawned adds instantly. Stay out of frontal. During P1 Slam timing, help execute LoS skip cleanly.\nHealers: Never dispel Seed in raid (explodes). Track spikes after resets and during add pressure.\nClass Specific: Assigned dispeller handles Seed only outside stack/raid if needed.\nBoss Ability: Seed explodes on dispel, cleave, and threat resets. P1 Slam reset can be LoS-skipped; later phases are direct resets."
+        },
+        ["Rotgrowl"] = {
+            ["Default"] = "Tanks: Keep Rotgrowl faced away and stable while Kodiak is controlled/killed.\nDPS: Kill Kodiak (bear add) fast; boss becomes vulnerable after bear dies. Move out of arrow AoE.\nHealers: Prepare for damage on fixate target and fear moments; keep movement-safe healing.\nClass Specific: Mobility classes kite safely if chased by Kodiak.\nBoss Ability: Kodiak fixates/chases with fear moments; arrow AoE requires movement. Flaming Bolt targets a random player."
+        },
+        ["Loktanag the Vile"] = {
+            ["Default"] = "Tanks: MT moves boss with raid in a hexagon path while keeping boss out of cloud drops.\nDPS: Everyone stacks so clouds drop in one controlled spot; no player outside stack. Kill spawned adds fast while moving with tank.\nHealers: Heavy dispel/decurse/cure priority while raid stays stacked and moving.\nClass Specific: Shamans keep Poison Cleansing Totem coverage.\nBoss Ability: Poison clouds target random players; controlled stacking keeps room usable. Add spawns overlap cloud movement."
+        },
+        ["Trioch the Devourer"] = {
+            ["Default"] = "Tanks: Keep Trioch faced away; tank stacks are expected while holding frontal.\nDPS: Never stand in front and avoid frontal stack debuffs. Move out of poison clouds and kill adds.\nHealers: Each stack increases tank vulnerability; prepare escalating tank damage.\nClass Specific: Cleanse support where class toolkit allows.\nBoss Ability: Three heads (frost/fire/poison) apply stacking frontals. Follow on-screen instructions whenever Trioch conducts an ability."
+        },
+        ["Selenaxx Foulheart"] = {
+            ["Default"] = "Tanks: Gain threat by standing in line between boss and crystal. Swap tanks at 85/65/45/25% for heavy post-threshold mechanics.\nDPS: Kill adds on spawn and interrupt immediately.\nHealers: Track shadow-vulnerability tank debuff and swap spikes.\nClass Specific: Assign one player to stay furthest for Rain of Destruction bait.\nBoss Ability: If boss is closest to crystal he gains stacks (12 = wipe). Rain of Destruction hits the furthest target; move out of fire."
+        },
+        ["Ormanos the Cracked"] = {
+            ["Default"] = "Tanks: Keep boss away from clones. Hold boss steady while Tremor of Ormanos spawns are handled.\nDPS: Kill Tremor clones fast or they spawn extra adds and AoE pressure.\nHealers: Be ready for heavy spike healing during clone AoE around melee.\nClass Specific: Curse of Tongues on boss to slow charge casts.\nBoss Ability: During charge, EVERYONE stacks on the assigned marker to split damage correctly. Boss gains rotating spell-school vulnerability windows."
+        },
+        ["Chieftain Partath"] = {
+            ["Default"] = "Tanks: Keep boss and illuminators on separate sides. During boss immunity, move illuminators above boss.\nDPS: Kill spawned adds (not illuminators). Interrupt illuminator Regrowth; otherwise nuke boss.\nHealers: Prepare burst healing during movement windows and Leeching Strike cast.\nClass Specific: Assign strict interrupt rotation on illuminators.\nBoss Ability: Leeching Strike turns boss toward raid path and starts casting; melee must sidestep then return."
+        },
+        ["Archdruid Kronn"] = {
+            ["Default"] = "Tanks: Outside group handles hostile boss. Two groups swap every ~30s by Phasebound timer.\nDPS: Outside: kill boss + Xavian Image only. Inside: kill image/adds before they reach portal.\nHealers: Inside heal friendly boss to ~90%, then sync 100% inside with 0% outside within ~10s.\nClass Specific: Druids are preferred inside healers (no inside damage taken).\nBoss Ability: Dual-world sync fight: dispel/decurse/cure everything, rotate in/out on debuff timing, and finish both realms simultaneously."
+        },
+        ["Ursol"] = {
+            ["Default"] = "Tanks: Armor is ignored, so prioritize high-HP setup and stable positioning.\nDPS: If chased by fiends, kite. Assign fiend-killers while rest stay boss. At 30% all kill adds, then boss (optional LIP nuking adds after banish phase).\nHealers: If chased by fiends, kite and call path. Cover fear phases, add pressure, and post-30% add burst.\nClass Specific: Decurse Mind-Shattering Rumble.\nBoss Ability: Fear and root zones occur. Fiends spawn; if fixated, run. Immune/banish phase transitions into add cleanup, then boss kill window."
+        },
+        ["Peroth'arn"] = {
+            ["Default"] = "No tactic added yet."
         }
     }
 }
