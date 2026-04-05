@@ -548,7 +548,9 @@ f:SetScript("OnEvent", function()
 
   elseif event == "LOOT_CLOSED" then
     if not TL_AwaitingLoot then return end
-    TL_SlotsRemaining = CountRemainingLootSlots()
+    -- Do not rescan slots on close: after the window closes, the API often reports
+    -- zero loot slots even if items are still on the corpse. Keep the value tracked
+    -- from LOOT_OPENED/LOOT_SLOT_CLEARED instead.
 
     -- If I'm the ML, notify raid when corpse empties so RL can react
     local method = GetLootMethod and GetLootMethod()
