@@ -153,11 +153,23 @@ end
 local function CountRemainingLootSlots()
   local n = GetNumLootItems and GetNumLootItems() or 0
   if n <= 0 then return 0 end
+  if not LootSlotHasItem then return n end
+
   local remaining = 0
   for i=1, n do
-    if LootSlotHasItem and LootSlotHasItem(i) then
+    local hasItem = LootSlotHasItem(i) and true or false
+    if (not hasItem) and GetLootSlotInfo then
+      local texture = GetLootSlotInfo(i)
+      if texture then hasItem = true end
+    end
+    if hasItem then
       remaining = remaining + 1
     end
+  end
+  if remaining == 0 then
+    -- Some clients under Master Loot can report no per-slot item flags even
+    -- while loot exists; fall back to slot count captured from GetNumLootItems.
+    return n
   end
   return remaining
 end
@@ -548,11 +560,16 @@ f:SetScript("OnEvent", function()
 
   elseif event == "LOOT_CLOSED" then
     if not TL_AwaitingLoot then return end
-    TL_SlotsRemaining = CountRemainingLootSlots()
+    local remaining = TL_SlotsRemaining
+    if remaining == nil then
+      -- Fallback only if we never captured state from LOOT_OPENED
+      remaining = CountRemainingLootSlots()
+    end
+    TL_SlotsRemaining = remaining
 
     -- If I'm the ML, notify raid when corpse empties so RL can react
     local method = GetLootMethod and GetLootMethod()
-    if method == "master" and TL_SawLootWindow and (TL_SlotsRemaining or 0) == 0 then
+    if method == "master" and TL_SawLootWindow and (remaining or 0) == 0 then
       if IsSelfMasterLooter() then
         if TL_OpenedLootMob then
           TL_EmptiedLootMobs[TL_OpenedLootMob] = true
@@ -603,7 +620,7 @@ f:SetScript("OnEvent", function()
     if method ~= "master" then return end
     if not IsSelfMasterLooter() then return end
     if not TL_SawLootWindow then return end
-    if (TL_SlotsRemaining or 0) == 0 and not TL_AwaitingLoot then
+    if (remaining or 0) == 0 and not TL_AwaitingLoot then
       TacticaLoot_ShowPopup()
     end
 
