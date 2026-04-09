@@ -1,5 +1,5 @@
 # Tactica
-## Auto-build/sort raids (invite/gearcheck), post tactics, set loot rules & assign roles - synced!
+## Auto-build/sort raids (invite/gearcheck), post tactics, preset masterloot, loot rules & assign roles - synced!
 Tactical addon for raid leading with ease — post ~90 clear boss strategies (or add your own), auto-build and sort raids (LFM creator/poster with auto-invite/auto-gearcheck/auto-assign or raid composition tool), assign & sync roles in raid roster, export participants, and smooth out loot mode changes, all in one place.
 
 _Access all functionalities and commands via **Minimap Icon**_ (<img width="15" height="15" alt="Tactica-Icon" src="https://github.com/user-attachments/assets/0e7b9ac6-d5c4-4f7e-b944-9fc8f96ec73b" />).
