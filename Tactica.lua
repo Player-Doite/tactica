@@ -53,6 +53,7 @@ end
 
 local _verGuildAnnounced, _verRaidAnnounced, _verNotifiedOnce = false, false, false
 local _verLastEcho = 0
+local _verWhoRid = nil
 
 local _laterQueue = {}
 local _laterFrame = CreateFrame("Frame")
@@ -132,18 +133,24 @@ local function Tactica_OnAddonMessageVersion(prefix, text, sender, channel)
     end
     return
   end
-  if text == "TACTICA_WHO" then
-    if channel then
-      local msg = "TACTICA_ME:" .. tostring(mine)
+  if string.sub(text, 1, 12) == "TACTICA_WHO:" then
+    local payload = string.sub(text, 13) or ""
+    local _, _, requester, rid = string.find(payload, "^([^:]+)%:(.+)$")
+    if requester and requester ~= "" and rid and rid ~= "" and channel then
+      local msg = "TACTICA_ME:" .. tostring(requester) .. ":" .. tostring(rid) .. ":" .. tostring(mine)
       if SendAddonMessage then SendAddonMessage(TACTICA_PREFIX, msg, channel) end
     end
     return
   end
   if string.sub(text,1,11) == "TACTICA_ME:" then
-    local ver = string.sub(text, 12)
-    local relation = VersionIsNewer(mine, ver) and "older" or (VersionIsNewer(ver, mine) and "newer" or "equal")
-    local frame = (DEFAULT_CHAT_FRAME or ChatFrame1)
-    if frame then frame:AddMessage(string.format("|cff33ff99Tactica:|r %s has %s (you: %s) [%s]", tostring(sender or "?"), tostring(ver or "?"), tostring(mine), relation)) end
+    local payload = string.sub(text, 12) or ""
+    local _, _, requester, rid, ver = string.find(payload, "^([^:]+)%:([^:]+)%:(.*)$")
+    local me = (UnitName and UnitName("player")) or ""
+    if requester and requester == me and rid and _verWhoRid and rid == _verWhoRid then
+      local relation = VersionIsNewer(mine, ver) and "older" or (VersionIsNewer(ver, mine) and "newer" or "equal")
+      local frame = (DEFAULT_CHAT_FRAME or ChatFrame1)
+      if frame then frame:AddMessage(string.format("|cff33ff99Tactica:|r %s has %s (you: %s) [%s]", tostring(sender or "?"), tostring(ver or "?"), tostring(mine), relation)) end
+    end
     return
   end
 
@@ -2684,12 +2691,17 @@ SLASH_TTVERSIONWHO1 = "/ttversionwho"
 SlashCmdList["TTVERSIONWHO"] = function()
   (DEFAULT_CHAT_FRAME or ChatFrame1):AddMessage("|cff33ff99Tactica:|r version WHO sent. Listening for replies...")
   local sent = false
-  if UnitInRaid and UnitInRaid("player") then
-    SendAddonMessage("TACTICA", "TACTICA_WHO", "RAID"); sent = true
-  elseif (GetNumPartyMembers and GetNumPartyMembers() > 0) then
-    SendAddonMessage("TACTICA", "TACTICA_WHO", "PARTY"); sent = true
-  elseif IsInGuild and IsInGuild() then
-    SendAddonMessage("TACTICA", "TACTICA_WHO", "GUILD"); sent = true
+  local me = (UnitName and UnitName("player")) or nil
+  if me and me ~= "" then
+    _verWhoRid = tostring(((GetTime and GetTime()) or 0))
+    local msg = "TACTICA_WHO:" .. tostring(me) .. ":" .. tostring(_verWhoRid)
+    if UnitInRaid and UnitInRaid("player") then
+      SendAddonMessage("TACTICA", msg, "RAID"); sent = true
+    elseif (GetNumPartyMembers and GetNumPartyMembers() > 0) then
+      SendAddonMessage("TACTICA", msg, "PARTY"); sent = true
+    elseif IsInGuild and IsInGuild() then
+      SendAddonMessage("TACTICA", msg, "GUILD"); sent = true
+    end
   end
   if not sent then (DEFAULT_CHAT_FRAME or ChatFrame1):AddMessage("|cff33ff99Tactica:|r No channels available (raid/party/guild).") end
 end
